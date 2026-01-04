@@ -13,7 +13,7 @@ export interface LineBotAlert {
   timestamp?: string
 }
 
-// Send alert to specific LINE user
+// ส่งการแจ้งเตือนไปยังผู้ใช้ LINE คนใดคนหนึ่ง
 export async function sendLineBotAlert(userId: string, alert: LineBotAlert): Promise<boolean> {
   try {
     const message = formatAlertForLineBot(alert)
@@ -31,12 +31,12 @@ export async function sendLineBotAlert(userId: string, alert: LineBotAlert): Pro
 
     return response.ok
   } catch (error) {
-    console.error("Failed to send LINE Bot alert:", error)
+    console.error("ไม่สามารถส่งการแจ้งเตือนทาง LINE Bot:", error)
     return false
   }
 }
 
-// Broadcast alert to all followers
+// ส่งการแจ้งเตือนไปยังเพื่อนทั้งหมด
 export async function broadcastLineBotAlert(alert: LineBotAlert): Promise<boolean> {
   try {
     const message = formatAlertForLineBot(alert)
@@ -53,7 +53,7 @@ export async function broadcastLineBotAlert(alert: LineBotAlert): Promise<boolea
 
     return response.ok
   } catch (error) {
-    console.error("Failed to broadcast LINE Bot alert:", error)
+    console.error("ไม่สามารถส่งการแจ้งเตือนแบบ broadcast:", error)
     return false
   }
 }
@@ -69,9 +69,9 @@ export function formatAlertForLineBot(alert: LineBotAlert): string {
 
   const typeText =
     {
-      anomaly: "Anomaly Detected",
-      prediction: "Predictive Alert",
-      optimization: "Optimization Suggestion",
+      anomaly: "ตรวจพบความผิดปกติ",
+      prediction: "การทำนายจาก AI",
+      optimization: "คำแนะนำการปรับปรุง",
     }[alert.type] || alert.type
 
   return `${severityEmoji} ${typeText}
@@ -80,14 +80,14 @@ export function formatAlertForLineBot(alert: LineBotAlert): string {
 
 ${alert.description}
 
-🤖 AI Confidence: ${alert.aiConfidence}%
+🤖 ความมั่นใจของ AI: ${alert.aiConfidence}%
 ⏰ ${alert.timestamp || new Date().toLocaleString("th-TH")}
 
-Type "status" to check system status
-Type "help" for more commands`
+พิมพ์ "สถานะ" เพื่อดูสถานะระบบ
+พิมพ์ "ช่วยเหลือ" เพื่อดูคำสั่งทั้งหมด`
 }
 
-// Format system status for LINE
+// จัดรูปแบบสถานะระบบสำหรับ LINE
 export function formatSystemStatusForLine(data: {
   totalServers: number
   onlineServers: number
@@ -95,15 +95,15 @@ export function formatSystemStatusForLine(data: {
   powerUsage: number
   uptime: number
 }): string {
-  return `📊 Data Center Status Report
+  return `📊 รายงานสถานะ Data Center
 
-🖥️ Servers: ${data.onlineServers}/${data.totalServers} online
-🌡️ Temperature: ${data.avgTemperature.toFixed(1)}°C
-⚡ Power Usage: ${data.powerUsage}%
+🖥️ เซิร์ฟเวอร์: ${data.onlineServers}/${data.totalServers} ออนไลน์
+🌡️ อุณหภูมิเฉลี่ย: ${data.avgTemperature.toFixed(1)}°C
+⚡ การใช้พลังงาน: ${data.powerUsage}%
 🔄 Uptime: ${data.uptime}%
 
-${data.onlineServers === data.totalServers ? "✅ All systems operational" : "⚠️ Some servers offline"}
+${data.onlineServers === data.totalServers ? "✅ ระบบทั้งหมดทำงานปกติ" : "⚠️ เซิร์ฟเวอร์บางตัวออฟไลน์"}
 
-Type "alert" to see recent alerts
-Type "help" for more commands`
+พิมพ์ "แจ้งเตือน" เพื่อดู alerts ล่าสุด
+พิมพ์ "ช่วยเหลือ" เพื่อดูคำสั่งทั้งหมด`
 }
