@@ -21,7 +21,7 @@ export function SettingsPage() {
   const [lineNotifyEnabled, setLineNotifyEnabled] = useState(false)
   const [lineNotifyToken, setLineNotifyToken] = useState("")
   const [lineBotEnabled, setLineBotEnabled] = useState(true)
-  const [lineChannelAccessToken, setLineChannelAccessToken] = useState("j3crGSU4CYJa97muDOmjOBJjVhKC+SLsco1qi2QoErrKQPq20v3W6wmbv6JPNv6B6pZa1IKMoY4ym2FfOcgUWw04m1hm7SPP/03CsapI97bVRxyGxKl41zT3rVh4M+fxvDFHnIlWJjb1ovj+QLRP1gdB04t89/1O/w1cDnyilFU=")
+  const [lineChannelAccessToken, setLineChannelAccessToken] = useState("XUuj+bHq21H40eIheTp7VzzP5bQufdtwD3c0VYYvS6CaTV2evII8kNaEgqah/rRJ6pZa1IKMoY4ym2FfOcgUWw04m1hm7SPP/03CsapI97Y51sNsyhNOOweERoAbgbR0tyfk4Kn4Vofu8v1MRZycLwdB04t89/1O/w1cDnyilFU=")
   const [lineChannelSecret, setLineChannelSecret] = useState("e494662992f69b8a117272368a8eec70")
   const [isSendingTest, setIsSendingTest] = useState(false)
   const { toast } = useToast()
