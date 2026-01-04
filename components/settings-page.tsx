@@ -20,7 +20,7 @@ export function SettingsPage() {
   const [powerThreshold, setPowerThreshold] = useState([80])
   const [lineNotifyEnabled, setLineNotifyEnabled] = useState(false)
   const [lineNotifyToken, setLineNotifyToken] = useState("")
-  const [lineBotEnabled, setLineBotEnabled] = useState(false)
+  const [lineBotEnabled, setLineBotEnabled] = useState(true)
   const [lineChannelAccessToken, setLineChannelAccessToken] = useState("j3crGSU4CYJa97muDOmjOBJjVhKC+SLsco1qi2QoErrKQPq20v3W6wmbv6JPNv6B6pZa1IKMoY4ym2FfOcgUWw04m1hm7SPP/03CsapI97bVRxyGxKl41zT3rVh4M+fxvDFHnIlWJjb1ovj+QLRP1gdB04t89/1O/w1cDnyilFU=")
   const [lineChannelSecret, setLineChannelSecret] = useState("e494662992f69b8a117272368a8eec70")
   const [isSendingTest, setIsSendingTest] = useState(false)
