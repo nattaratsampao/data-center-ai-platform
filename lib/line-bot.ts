@@ -88,22 +88,29 @@ ${alert.description}
 }
 
 // จัดรูปแบบสถานะระบบสำหรับ LINE
-export function formatSystemStatusForLine(data: {
-  totalServers: number
-  onlineServers: number
-  avgTemperature: number
-  powerUsage: number
-  uptime: number
-}): string {
-  return `📊 รายงานสถานะ Data Center
+export async function formatSystemStatusForLine(): Promise<string> {
+  try {
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"
 
-🖥️ เซิร์ฟเวอร์: ${data.onlineServers}/${data.totalServers} ออนไลน์
-🌡️ อุณหภูมิเฉลี่ย: ${data.avgTemperature.toFixed(1)}°C
-⚡ การใช้พลังงาน: ${data.powerUsage}%
-🔄 Uptime: ${data.uptime}%
+    const response = await fetch(`${baseUrl}/api/realtime/data`, {
+      cache: "no-store",
+    })
 
-${data.onlineServers === data.totalServers ? "✅ ระบบทั้งหมดทำงานปกติ" : "⚠️ เซิร์ฟเวอร์บางตัวออฟไลน์"}
+    const data = await response.json()
+
+    return `📊 รายงานสถานะ Data Center
+
+🖥️ เซิร์ฟเวอร์: ${data.stats.onlineServers}/${data.stats.totalServers} ออนไลน์
+🌡️ อุณหภูมิเฉลี่ย: ${data.stats.avgTemperature}°C
+⚡ การใช้พลังงาน: ${data.stats.powerUsage}%
+🔄 Uptime: ${data.stats.uptime.toFixed(2)}%
+
+${data.stats.onlineServers === data.stats.totalServers ? "✅ ระบบทั้งหมดทำงานปกติ" : "⚠️ เซิร์ฟเวอร์บางตัวออฟไลน์"}
 
 พิมพ์ "แจ้งเตือน" เพื่อดู alerts ล่าสุด
 พิมพ์ "ช่วยเหลือ" เพื่อดูคำสั่งทั้งหมด`
+  } catch (error) {
+    console.error("Error fetching system status:", error)
+    return "❌ ไม่สามารถดึงข้อมูลได้ในขณะนี้"
+  }
 }

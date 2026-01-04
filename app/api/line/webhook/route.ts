@@ -68,80 +68,107 @@ async function handleTextMessage(event: any) {
   let replyMessage = ""
 
   // AI-powered responses based on user queries
+  const realtimeData = await fetchRealtimeData()
+
   if (userMessage.includes("status") || userMessage.includes("สถานะ")) {
-    replyMessage = `📊 Data Center Status
+    replyMessage = `📊 สถานะ Data Center
 
-🖥️ Servers: 8 online
-🌡️ Avg Temperature: 24.5°C
-⚡ Power Usage: 78%
-🔄 Uptime: 99.8%
+🖥️ เซิร์ฟเวอร์: ${realtimeData.stats.onlineServers}/${realtimeData.stats.totalServers} ออนไลน์
+🌡️ อุณหภูมิเฉลี่ย: ${realtimeData.stats.avgTemperature}°C
+⚡ การใช้พลังงาน: ${realtimeData.stats.powerUsage}%
+🔄 Uptime: ${realtimeData.stats.uptime.toFixed(2)}%
 
-✅ All systems operational!`
+${realtimeData.stats.onlineServers === realtimeData.stats.totalServers ? "✅ ระบบทั้งหมดทำงานปกติ" : "⚠️ เซิร์ฟเวอร์บางตัวต้องการความสนใจ"}`
   } else if (userMessage.includes("alert") || userMessage.includes("แจ้งเตือน")) {
-    replyMessage = `🚨 Recent Alerts
+    const criticalServers = realtimeData.servers.filter((s) => s.status === "critical")
+    const warningServers = realtimeData.servers.filter((s) => s.status === "warning")
 
-⚠️ 2 Active Warnings:
-• Server-03: High CPU (85%)
-• CRAC-01: Maintenance due in 7 days
+    replyMessage = `🚨 การแจ้งเตือนล่าสุด
 
-Type "help" for more commands`
+${criticalServers.length > 0 ? `🔴 Critical: ${criticalServers.length} เซิร์ฟเวอร์` : ""}
+${warningServers.length > 0 ? `⚠️ Warning: ${warningServers.length} เซิร์ฟเวอร์` : ""}
+
+${criticalServers.length === 0 && warningServers.length === 0 ? "✅ ไม่มีการแจ้งเตือนในขณะนี้" : ""}
+
+${criticalServers.map((s) => `• ${s.name}: CPU ${s.cpu}%`).join("\n")}
+${warningServers.map((s) => `• ${s.name}: CPU ${s.cpu}%`).join("\n")}
+
+พิมพ์ "ช่วยเหลือ" เพื่อดูคำสั่งเพิ่มเติม`
   } else if (userMessage.includes("temperature") || userMessage.includes("อุณหภูมิ")) {
-    replyMessage = `🌡️ Temperature Status
+    const temps = realtimeData.sensors.temperature
+    const avgTemp = (temps.reduce((sum, t) => sum + t.value, 0) / temps.length).toFixed(1)
+    const maxTemp = Math.max(...temps.map((t) => t.value)).toFixed(1)
+    const minTemp = Math.min(...temps.map((t) => t.value)).toFixed(1)
 
-Server Room: 24.5°C ✅
-Hot Aisle: 32.1°C ⚠️
-Cold Aisle: 18.2°C ✅
+    replyMessage = `🌡️ สถานะอุณหภูมิ
 
-CRAC units operating normally`
+อุณหภูมิเฉลี่ย: ${avgTemp}°C
+อุณหภูมิสูงสุด: ${maxTemp}°C
+อุณหภูมิต่ำสุด: ${minTemp}°C
+
+${temps.filter((t) => t.status === "warning").length > 0 ? "⚠️ มี Sensor บางตัวแสดงค่าสูง" : "✅ ระบบทำความเย็นทำงานปกติ"}`
   } else if (userMessage.includes("help") || userMessage.includes("ช่วยเหลือ")) {
-    replyMessage = `🤖 Data Center AI Assistant
+    replyMessage = `🤖 ผู้ช่วย Data Center AI
 
-Available commands:
-• status - Overall system status
-• alert - Recent alerts
-• temperature - Temperature info
-• power - Power consumption
-• servers - Server health
-• predict - AI predictions
+คำสั่งที่ใช้ได้:
+• สถานะ - ดูสถานะระบบโดยรวม
+• แจ้งเตือน - การแจ้งเตือนล่าสุด
+• อุณหภูมิ - ข้อมูลอุณหภูมิ
+• พลังงาน - การใช้พลังงาน
+• เซิร์ฟเวอร์ - สุขภาพเซิร์ฟเวอร์
+• ทำนาย - การทำนายจาก AI
 
-Type any command to get started!`
+พิมพ์คำสั่งใดก็ได้เพื่อเริ่มต้น!`
   } else if (userMessage.includes("power") || userMessage.includes("พลังงาน")) {
-    replyMessage = `⚡ Power Status
+    const power = realtimeData.sensors.power
 
-Total Consumption: 78 kW
-PUE: 1.42
-Efficiency: Good ✅
+    replyMessage = `⚡ สถานะพลังงาน
 
-Server Power: 55 kW
-Cooling Power: 18 kW
-Other: 5 kW`
+การใช้งานรวม: ${power.total} kW
+PUE: ${realtimeData.stats.pue}
+ประสิทธิภาพ: ${realtimeData.stats.pue < 1.5 ? "ดีมาก ✅" : "พอใช้ ⚠️"}
+
+เซิร์ฟเวอร์: ${power.servers} kW
+ระบบทำความเย็น: ${power.cooling} kW`
   } else if (userMessage.includes("servers") || userMessage.includes("เซิร์ฟเวอร์")) {
-    replyMessage = `🖥️ Server Health
+    const excellentCount = realtimeData.servers.filter((s) => s.healthScore >= 90).length
+    const goodCount = realtimeData.servers.filter((s) => s.healthScore >= 80 && s.healthScore < 90).length
+    const warningCount = realtimeData.servers.filter((s) => s.healthScore < 80).length
 
-Total: 8 servers
-Online: 8 ✅
-Offline: 0
+    replyMessage = `🖥️ สุขภาพเซิร์ฟเวอร์
 
-Health Scores:
-• Excellent (90-100): 6 servers
-• Good (80-89): 2 servers
-• Warning (<80): 0 servers`
+ทั้งหมด: ${realtimeData.stats.totalServers} เครื่อง
+ออนไลน์: ${realtimeData.stats.onlineServers} ✅
+ออฟไลน์: ${realtimeData.stats.totalServers - realtimeData.stats.onlineServers}
+
+คะแนนสุขภาพ:
+• ดีมาก (90-100): ${excellentCount} เครื่อง
+• ดี (80-89): ${goodCount} เครื่อง
+• ต้องดูแล (<80): ${warningCount} เครื่อง`
   } else if (userMessage.includes("predict") || userMessage.includes("ทำนาย")) {
-    replyMessage = `🔮 AI Predictions
+    const aiInsights = realtimeData.aiInsights
 
-Next 24 hours:
-• Temperature spike expected at 14:00 (32°C)
-• Workload increase at 09:00 (+25%)
-• Server-03 CPU may need attention
+    replyMessage = `🔮 การทำนายจาก AI
 
-Recommendation: Schedule cooling boost at 13:30`
+ความมั่นใจ: ${aiInsights.confidenceScore}%
+
+${aiInsights.anomalyDetected ? "🚨 ตรวจพบความผิดปกติ" : "✅ ไม่พบความผิดปกติ"}
+
+การแจ้งเตือนแบบทำนาย: ${aiInsights.predictiveAlerts} รายการ
+คำแนะนำการปรับปรุง: ${aiInsights.optimizationsSuggested} รายการ
+
+${aiInsights.anomalyDetected ? "แนะนำ: ตรวจสอบเซิร์ฟเวอร์ที่มีสถานะ warning" : "แนะนำ: ระบบทำงานปกติ ไม่ต้องดำเนินการ"}`
   } else {
     replyMessage = `สวัสดีครับ! 👋
 
 ผม Data Center AI Assistant
-พร้อมช่วยคุณตรวจสอบระบบ Data Center
+พร้อมช่วยคุณตรวจสอบระบบ Data Center แบบ Real-time
 
-พิมพ์ "help" เพื่อดูคำสั่งทั้งหมด`
+ข้อมูลปัจจุบัน:
+🖥️ เซิร์ฟเวอร์: ${realtimeData.stats.onlineServers}/${realtimeData.stats.totalServers} ออนไลน์
+🌡️ อุณหภูมิ: ${realtimeData.stats.avgTemperature}°C
+
+พิมพ์ "ช่วยเหลือ" เพื่อดูคำสั่งทั้งหมด`
   }
 
   // Send reply
@@ -164,7 +191,7 @@ async function handleFollow(event: any) {
 ✅ คำแนะนำจาก AI
 ✅ รายงานสถานะระบบ
 
-พิมพ์ "help" เพื่อเริ่มต้นใช้งาน`
+พิมพ์ "ช่วยเหลือ" เพื่อเริ่มต้นใช้งาน`
 
   await replyToUser(replyToken, welcomeMessage)
 
@@ -208,5 +235,47 @@ async function replyToUser(replyToken: string, message: string) {
     }
   } catch (error) {
     console.error("Error sending reply:", error)
+  }
+}
+
+async function fetchRealtimeData() {
+  try {
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"
+
+    const response = await fetch(`${baseUrl}/api/realtime/data`, {
+      cache: "no-store",
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch realtime data")
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("[v0] Error fetching realtime data:", error)
+    // Fallback data
+    return {
+      stats: {
+        totalServers: 8,
+        onlineServers: 8,
+        avgTemperature: 25,
+        avgCPU: 50,
+        powerUsage: 75,
+        pue: 1.42,
+        uptime: 99.8,
+      },
+      servers: [],
+      sensors: {
+        temperature: [],
+        humidity: [],
+        power: { total: 30, servers: 20, cooling: 8 },
+      },
+      aiInsights: {
+        anomalyDetected: false,
+        predictiveAlerts: 0,
+        optimizationsSuggested: 0,
+        confidenceScore: 85,
+      },
+    }
   }
 }
