@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Zap, Shield, TrendingUp, Activity } from "lucide-react"
 import Link from "next/link"
+// 1. เพิ่มการ import Image ของ Next.js
+import Image from "next/image"
 
 export default function LandingPage() {
   const [showContent, setShowContent] = useState(false)
@@ -44,10 +46,20 @@ export default function LandingPage() {
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 className="text-center"
               >
-                <div className="w-48 h-48 mx-auto mb-6 bg-gradient-to-br from-blue-600 to-teal-600 rounded-3xl flex items-center justify-center shadow-2xl">
-                  <span className="text-6xl font-bold text-white">🏫</span>
+                {/* 2. แก้ไขส่วนแสดงโลโก้โรงเรียน */}
+                {/* เพิ่ม p-4 เพื่อให้มีระยะห่างจากขอบ และ overflow-hidden */}
+                <div className="w-48 h-48 mx-auto mb-6 bg-gradient-to-br from-blue-600 to-teal-600 rounded-3xl flex items-center justify-center shadow-2xl p-4 overflow-hidden relative">
+                  {/* แทนที่ span ด้วย Image */}
+                  {/* หมายเหตุ: อย่าลืมเอารูป school-logo.png ไปใส่ในโฟลเดอร์ public */}
+                  <Image
+                    src="/school-logo.png" // เปลี่ยน path ตามชื่อไฟล์จริงของคุณในโฟลเดอร์ public
+                    alt="ตราโรงเรียน"
+                    width={160}
+                    height={160}
+                    className="object-contain w-full h-full"
+                  />
                 </div>
-                <h1 className="text-4xl font-bold text-gray-900">โรงเรียนของคุณ</h1>
+                <h1 className="text-4xl font-bold text-gray-900">โรงเรียนวิทยาศาสตร์จุฬาภรณราชวิทยาลัย ลพบุรี</h1>
               </motion.div>
             )}
 
@@ -59,12 +71,22 @@ export default function LandingPage() {
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 className="text-center"
               >
+                {/* 3. แก้ไขส่วนแสดงโลโก้การแข่งขัน */}
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 2, ease: "linear", repeat: Number.POSITIVE_INFINITY }}
-                  className="w-48 h-48 mx-auto mb-6 bg-gradient-to-br from-teal-600 to-blue-600 rounded-full flex items-center justify-center shadow-2xl"
+                  // เพิ่ม p-4 และ overflow-hidden เช่นกัน
+                  className="w-48 h-48 mx-auto mb-6 bg-gradient-to-br from-teal-600 to-blue-600 rounded-full flex items-center justify-center shadow-2xl p-4 overflow-hidden relative"
                 >
-                  <span className="text-6xl">🏆</span>
+                  {/* แทนที่ span ด้วย Image และมันจะหมุนตาม container */}
+                  {/* หมายเหตุ: อย่าลืมเอารูป competition-logo.png ไปใส่ในโฟลเดอร์ public */}
+                  <Image
+                    src="/competition-logo.png" // เปลี่ยน path ตามชื่อไฟล์จริงของคุณในโฟลเดอร์ public
+                    alt="โลโก้การแข่งขัน"
+                    width={160}
+                    height={160}
+                    className="object-contain w-full h-full"
+                  />
                 </motion.div>
                 <h1 className="text-4xl font-bold text-gray-900">Young Business IT</h1>
               </motion.div>
@@ -117,8 +139,8 @@ export default function LandingPage() {
                   </h1>
                   <p className="text-2xl md:text-3xl text-gray-700 mb-4">Optimization AI Platform</p>
                   <p className="text-lg md:text-xl text-gray-600 mb-12 max-w-3xl mx-auto">
-                    ระบบ AI อัจฉริยะสำหรับบริหารจัดการ Data Center แบบอัตโนมัติ ด้วยเทคโนโลยี Machine Learning และ Unity 3D
-                    Simulation
+                    ระบบ AI อัจฉริยะสำหรับบริหารจัดการ Data Center แบบอัตโนมัติ ด้วยเทคโนโลยี Machine Learning และ Unity
+                    3D Simulation
                   </p>
                 </motion.div>
 
