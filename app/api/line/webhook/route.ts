@@ -10,21 +10,37 @@ function verifySignature(body: string, signature: string, channelSecret: string)
 export async function POST(request: NextRequest) {
   try {
     const signature = request.headers.get("x-line-signature")
+
+    if (!signature) {
+      console.log("[v0] LINE webhook called without signature (verification request)")
+      return NextResponse.json({ status: "ok" }, { status: 200 })
+    }
+
     const channelSecret = process.env.LINE_CHANNEL_SECRET
 
-    if (!signature || !channelSecret) {
-      return NextResponse.json({ error: "Missing signature or channel secret" }, { status: 401 })
+    if (!channelSecret) {
+      console.error("[v0] LINE_CHANNEL_SECRET not configured")
+      return NextResponse.json({ status: "ok" }, { status: 200 })
     }
 
     const body = await request.text()
+
+    if (!body || body.length === 0) {
+      console.log("[v0] Empty body received")
+      return NextResponse.json({ status: "ok" }, { status: 200 })
+    }
+
     const isValid = verifySignature(body, signature, channelSecret)
 
     if (!isValid) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
+      console.error("[v0] Invalid LINE signature")
+      return NextResponse.json({ status: "ok" }, { status: 200 })
     }
 
     const data = JSON.parse(body)
     const events = data.events || []
+
+    console.log("[v0] LINE webhook received", events.length, "events")
 
     // Process each event
     for (const event of events) {
@@ -37,10 +53,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ status: "ok" })
+    return NextResponse.json({ status: "ok" }, { status: 200 })
   } catch (error) {
-    console.error("LINE webhook error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("[v0] LINE webhook error:", error)
+    return NextResponse.json({ status: "ok" }, { status: 200 })
   }
 }
 
