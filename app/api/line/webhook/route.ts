@@ -80,8 +80,9 @@ async function handleTextMessage(event: any) {
 
 ${realtimeData.stats.onlineServers === realtimeData.stats.totalServers ? "✅ ระบบทั้งหมดทำงานปกติ" : "⚠️ เซิร์ฟเวอร์บางตัวต้องการความสนใจ"}`
   } else if (userMessage.includes("alert") || userMessage.includes("แจ้งเตือน")) {
-    const criticalServers = realtimeData.servers.filter((s) => s.status === "critical")
-    const warningServers = realtimeData.servers.filter((s) => s.status === "warning")
+    // 🔥 แก้ไข 1: เพิ่ม : any ให้ s
+    const criticalServers = realtimeData.servers.filter((s: any) => s.status === "critical")
+    const warningServers = realtimeData.servers.filter((s: any) => s.status === "warning")
 
     replyMessage = `🚨 การแจ้งเตือนล่าสุด
 
@@ -90,15 +91,18 @@ ${warningServers.length > 0 ? `⚠️ Warning: ${warningServers.length} เซ�
 
 ${criticalServers.length === 0 && warningServers.length === 0 ? "✅ ไม่มีการแจ้งเตือนในขณะนี้" : ""}
 
-${criticalServers.map((s) => `• ${s.name}: CPU ${s.cpu}%`).join("\n")}
-${warningServers.map((s) => `• ${s.name}: CPU ${s.cpu}%`).join("\n")}
+${criticalServers.map((s: any) => `• ${s.name}: CPU ${s.cpu}%`).join("\n")}
+${warningServers.map((s: any) => `• ${s.name}: CPU ${s.cpu}%`).join("\n")}
 
 พิมพ์ "ช่วยเหลือ" เพื่อดูคำสั่งเพิ่มเติม`
   } else if (userMessage.includes("temperature") || userMessage.includes("อุณหภูมิ")) {
     const temps = realtimeData.sensors.temperature
-    const avgTemp = (temps.reduce((sum, t) => sum + t.value, 0) / temps.length).toFixed(1)
-    const maxTemp = Math.max(...temps.map((t) => t.value)).toFixed(1)
-    const minTemp = Math.min(...temps.map((t) => t.value)).toFixed(1)
+    // 🔥 แก้ไข 2: เพิ่ม : any ให้ sum และ t
+    const avgTemp = (temps.reduce((sum: any, t: any) => sum + t.value, 0) / temps.length).toFixed(1)
+    
+    // 🔥 แก้ไข 3: เพิ่ม : any ให้ t
+    const maxTemp = Math.max(...temps.map((t: any) => t.value)).toFixed(1)
+    const minTemp = Math.min(...temps.map((t: any) => t.value)).toFixed(1)
 
     replyMessage = `🌡️ สถานะอุณหภูมิ
 
@@ -106,7 +110,7 @@ ${warningServers.map((s) => `• ${s.name}: CPU ${s.cpu}%`).join("\n")}
 อุณหภูมิสูงสุด: ${maxTemp}°C
 อุณหภูมิต่ำสุด: ${minTemp}°C
 
-${temps.filter((t) => t.status === "warning").length > 0 ? "⚠️ มี Sensor บางตัวแสดงค่าสูง" : "✅ ระบบทำความเย็นทำงานปกติ"}`
+${temps.filter((t: any) => t.status === "warning").length > 0 ? "⚠️ มี Sensor บางตัวแสดงค่าสูง" : "✅ ระบบทำความเย็นทำงานปกติ"}`
   } else if (userMessage.includes("help") || userMessage.includes("ช่วยเหลือ")) {
     replyMessage = `🤖 ผู้ช่วย Data Center AI
 
@@ -131,9 +135,10 @@ PUE: ${realtimeData.stats.pue}
 เซิร์ฟเวอร์: ${power.servers} kW
 ระบบทำความเย็น: ${power.cooling} kW`
   } else if (userMessage.includes("servers") || userMessage.includes("เซิร์ฟเวอร์")) {
-    const excellentCount = realtimeData.servers.filter((s) => s.healthScore >= 90).length
-    const goodCount = realtimeData.servers.filter((s) => s.healthScore >= 80 && s.healthScore < 90).length
-    const warningCount = realtimeData.servers.filter((s) => s.healthScore < 80).length
+    // 🔥 แก้ไข 4: เพิ่ม : any ให้ s
+    const excellentCount = realtimeData.servers.filter((s: any) => s.healthScore >= 90).length
+    const goodCount = realtimeData.servers.filter((s: any) => s.healthScore >= 80 && s.healthScore < 90).length
+    const warningCount = realtimeData.servers.filter((s: any) => s.healthScore < 80).length
 
     replyMessage = `🖥️ สุขภาพเซิร์ฟเวอร์
 
