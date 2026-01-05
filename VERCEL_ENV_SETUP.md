@@ -126,7 +126,7 @@ vercel logs data-center-ai-platform --follow
 ```
 
 หรือดูใน Vercel Dashboard:
-1. เปิดโปรเจค
+1. เปิดโ��รเจค
 2. แท็บ **Functions**
 3. เลือก `/api/line/webhook`
 4. ดู **Logs** และ **Invocations**

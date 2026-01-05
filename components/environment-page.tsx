@@ -50,15 +50,33 @@ export function EnvironmentPage() {
   const [selectedType, setSelectedType] = useState<string>("all")
 
   useEffect(() => {
-    setSensors(generateSensorData())
+    const fetchRealtimeData = async () => {
+      try {
+        const response = await fetch("/api/realtime/data")
+        const data = await response.json()
+        setSensors(data.sensors)
+      } catch (error) {
+        console.error("[v0] Failed to fetch realtime sensor data:", error)
+        setSensors(generateSensorData())
+      }
+    }
+
+    fetchRealtimeData()
+    const interval = setInterval(fetchRealtimeData, 3000)
+    return () => clearInterval(interval)
   }, [])
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true)
-    setTimeout(() => {
-      setSensors(generateSensorData())
+    try {
+      const response = await fetch("/api/realtime/data")
+      const data = await response.json()
+      setSensors(data.sensors)
+    } catch (error) {
+      console.error("[v0] Failed to refresh sensor data:", error)
+    } finally {
       setIsRefreshing(false)
-    }, 1000)
+    }
   }
 
   const filteredSensors = selectedType === "all" ? sensors : sensors.filter((s) => s.type === selectedType)

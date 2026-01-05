@@ -40,15 +40,33 @@ export function ServersPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
 
   useEffect(() => {
-    setServers(generateServerData())
+    const fetchRealtimeData = async () => {
+      try {
+        const response = await fetch("/api/realtime/data")
+        const data = await response.json()
+        setServers(data.servers)
+      } catch (error) {
+        console.error("[v0] Failed to fetch realtime server data:", error)
+        setServers(generateServerData())
+      }
+    }
+
+    fetchRealtimeData()
+    const interval = setInterval(fetchRealtimeData, 3000)
+    return () => clearInterval(interval)
   }, [])
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true)
-    setTimeout(() => {
-      setServers(generateServerData())
+    try {
+      const response = await fetch("/api/realtime/data")
+      const data = await response.json()
+      setServers(data.servers)
+    } catch (error) {
+      console.error("[v0] Failed to refresh server data:", error)
+    } finally {
       setIsRefreshing(false)
-    }, 1000)
+    }
   }
 
   const handleSort = (column: keyof ServerData) => {

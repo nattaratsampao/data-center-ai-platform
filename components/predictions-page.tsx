@@ -40,9 +40,23 @@ export function PredictionsPage() {
   const [predictions, setPredictions] = useState<PredictionCard[]>([])
 
   useEffect(() => {
-    const data = generateServerData()
-    setServers(data)
-    setPredictions(getPredictions(data))
+    const fetchRealtimeData = async () => {
+      try {
+        const response = await fetch("/api/realtime/data")
+        const data = await response.json()
+        setServers(data.servers)
+        setPredictions(getPredictions(data.servers))
+      } catch (error) {
+        console.error("[v0] Failed to fetch realtime prediction data:", error)
+        const fallbackData = generateServerData()
+        setServers(fallbackData)
+        setPredictions(getPredictions(fallbackData))
+      }
+    }
+
+    fetchRealtimeData()
+    const interval = setInterval(fetchRealtimeData, 3000)
+    return () => clearInterval(interval)
   }, [])
 
   const highRiskCount = predictions.filter((p) => p.riskLevel === "high").length

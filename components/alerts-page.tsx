@@ -67,7 +67,20 @@ export function AlertsPage() {
   const [selectedType, setSelectedType] = useState<string>("all")
 
   useEffect(() => {
-    setAlerts(generateAlerts())
+    const fetchRealtimeData = async () => {
+      try {
+        const response = await fetch("/api/realtime/data")
+        const data = await response.json()
+        setAlerts(data.alerts)
+      } catch (error) {
+        console.error("[v0] Failed to fetch realtime alerts:", error)
+        setAlerts(generateAlerts())
+      }
+    }
+
+    fetchRealtimeData()
+    const interval = setInterval(fetchRealtimeData, 3000)
+    return () => clearInterval(interval)
   }, [])
 
   const filteredAlerts = selectedType === "all" ? alerts : alerts.filter((a) => a.type === selectedType)
