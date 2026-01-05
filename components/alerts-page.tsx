@@ -5,22 +5,70 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertTriangle, Brain, Zap, Bell, CheckCircle, X, Clock } from "lucide-react"
-import { generateAlerts, type AlertData } from "@/lib/mock-data"
+import { 
+  AlertTriangle, 
+  Brain, 
+  Zap, 
+  Bell, 
+  CheckCircle, 
+  X, 
+  Clock, 
+  Thermometer, 
+  Server, 
+  Activity, 
+  Wifi, 
+  HardDrive 
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 
-function getAlertIcon(type: AlertData["type"]) {
+// --- Interfaces ให้ตรงกับ API ใหม่ ---
+interface SimulationEvent {
+  id: string
+  type: string
+  severity: "low" | "medium" | "high" | "critical"
+  title: string
+  description: string
+  timestamp: Date
+  aiResponse?: string
+  resolved: boolean
+}
+
+// --- Helper Functions ---
+
+function getAlertIcon(type: string) {
   switch (type) {
-    case "anomaly":
-      return <AlertTriangle className="h-5 w-5" />
+    case "temperature_spike":
+    case "cooling_failure":
+      return <Thermometer className="h-5 w-5" />
+    case "power_surge":
+      return <Zap className="h-5 w-5" />
+    case "network_congestion":
+      return <Wifi className="h-5 w-5" />
+    case "disk_full":
+      return <HardDrive className="h-5 w-5" />
+    case "cpu_spike":
+    case "memory_leak":
+    case "workload_surge":
+      return <Activity className="h-5 w-5" />
+    case "ai_optimization":
     case "prediction":
       return <Brain className="h-5 w-5" />
-    case "optimization":
-      return <Zap className="h-5 w-5" />
+    case "maintenance_required":
+    case "hardware_failure":
+      return <Server className="h-5 w-5" />
+    default:
+      return <AlertTriangle className="h-5 w-5" />
   }
 }
 
-function getSeverityStyles(severity: AlertData["severity"]) {
+// จัดหมวดหมู่ Event Type ใหม่ ให้เข้ากับ Tabs เดิม
+function getCategory(type: string): "anomaly" | "prediction" | "optimization" {
+  if (type.includes("optimization") || type.includes("maintenance")) return "optimization"
+  if (type.includes("prediction") || type.includes("workload")) return "prediction"
+  return "anomaly" // default for spikes, failures, etc.
+}
+
+function getSeverityStyles(severity: string) {
   switch (severity) {
     case "critical":
       return {
@@ -31,99 +79,105 @@ function getSeverityStyles(severity: AlertData["severity"]) {
       }
     case "high":
       return {
-        bg: "bg-chart-4/10",
-        border: "border-chart-4/30",
-        text: "text-chart-4",
-        badge: "bg-chart-4 text-foreground",
+        bg: "bg-orange-500/10",
+        border: "border-orange-500/30",
+        text: "text-orange-500",
+        badge: "bg-orange-500 text-white",
       }
     case "medium":
       return {
-        bg: "bg-warning/10",
-        border: "border-warning/30",
-        text: "text-warning",
-        badge: "bg-warning text-warning-foreground",
+        bg: "bg-yellow-500/10",
+        border: "border-yellow-500/30",
+        text: "text-yellow-500",
+        badge: "bg-yellow-500 text-white",
       }
     case "low":
       return {
-        bg: "bg-primary/10",
-        border: "border-primary/30",
-        text: "text-primary",
-        badge: "bg-primary/20 text-primary",
+        bg: "bg-blue-500/10",
+        border: "border-blue-500/30",
+        text: "text-blue-500",
+        badge: "bg-blue-500 text-white",
+      }
+    default:
+      return {
+        bg: "bg-muted/10",
+        border: "border-muted/30",
+        text: "text-muted-foreground",
+        badge: "bg-muted text-muted-foreground",
       }
   }
 }
 
 function formatTime(date: Date | string): string {
-  // ✅ แก้ไข: รองรับทั้ง Date object และ String เพื่อความปลอดภัย
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (!(d instanceof Date) || isNaN(d.getTime())) return "N/A";
   
-  // เช็คว่าเป็นวันที่ที่ถูกต้องหรือไม่
-  if (!(d instanceof Date) || isNaN(d.getTime())) {
-    return "N/A"; 
-  }
-
   return d.toLocaleString("th-TH", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit"
   })
 }
 
+// --- Main Component ---
+
 export function AlertsPage() {
-  // ✅ เริ่มต้นด้วย Array ว่างเสมอ
-  const [alerts, setAlerts] = useState<AlertData[]>([])
+  const [alerts, setAlerts] = useState<SimulationEvent[]>([])
   const [selectedType, setSelectedType] = useState<string>("all")
 
-  // ✅ ฟังก์ชันแปลงข้อมูลให้ปลอดภัย (Safe Parsing)
-  const processData = (rawData: any) => {
-    // 1. เช็คว่าเป็น Array ไหม ถ้าไม่ให้คืนค่า Array ว่าง
-    const list = Array.isArray(rawData?.alerts) ? rawData.alerts : []
+  // ฟังก์ชันดึงและแปลงข้อมูล
+  const fetchAlerts = async () => {
+    try {
+      const response = await fetch("/api/realtime/data")
+      const data = await response.json()
+      
+      // ✅ 1. ดึงจาก activeEvents แทน alerts
+      const rawEvents = Array.isArray(data?.activeEvents) ? data.activeEvents : []
 
-    // 2. แปลง timestamp string เป็น Date object
-    return list.map((item: any) => ({
-      ...item,
-      timestamp: new Date(item.timestamp)
-    }))
+      // ✅ 2. แปลงข้อมูลให้ตรง Interface
+      const processedEvents = rawEvents.map((item: any) => ({
+        ...item,
+        timestamp: new Date(item.timestamp)
+      }))
+
+      // เรียงลำดับเอาเหตุการณ์ล่าสุดขึ้นก่อน
+      processedEvents.sort((a: any, b: any) => b.timestamp.getTime() - a.timestamp.getTime())
+
+      setAlerts(processedEvents)
+    } catch (error) {
+      console.error("Failed to fetch alerts:", error)
+    }
   }
 
   useEffect(() => {
-    const fetchRealtimeData = async () => {
-      try {
-        const response = await fetch("/api/realtime/data")
-        const data = await response.json()
-        
-        // ✅ ใช้ processData ตรวจสอบและแปลงข้อมูลก่อน set state
-        setAlerts(processData(data))
-        
-      } catch (error) {
-        console.error("[v0] Failed to fetch realtime alerts:", error)
-        setAlerts(generateAlerts())
-      }
-    }
-
-    fetchRealtimeData()
-    const interval = setInterval(fetchRealtimeData, 3000)
+    fetchAlerts()
+    const interval = setInterval(fetchAlerts, 3000)
     return () => clearInterval(interval)
   }, [])
 
-  // ✅ เพิ่ม || [] เพื่อป้องกันกรณี alerts หลุดเป็น undefined
-  const safeAlerts = alerts || []
-  const filteredAlerts = selectedType === "all" ? safeAlerts : safeAlerts.filter((a) => a.type === selectedType)
+  // Filtering Logic
+  const filteredAlerts = selectedType === "all" 
+    ? alerts 
+    : alerts.filter((a) => getCategory(a.type) === selectedType)
 
-  const criticalCount = safeAlerts.filter((a) => a.severity === "critical").length
-  const highCount = safeAlerts.filter((a) => a.severity === "high").length
-  const anomalyCount = safeAlerts.filter((a) => a.type === "anomaly").length
-  const predictionCount = safeAlerts.filter((a) => a.type === "prediction").length
-  const optimizationCount = safeAlerts.filter((a) => a.type === "optimization").length
+  // Stats Calculation
+  const criticalCount = alerts.filter((a) => a.severity === "critical").length
+  const highCount = alerts.filter((a) => a.severity === "high").length
+  
+  const anomalyCount = alerts.filter((a) => getCategory(a.type) === "anomaly").length
+  const predictionCount = alerts.filter((a) => getCategory(a.type) === "prediction").length
+  const optimizationCount = alerts.filter((a) => getCategory(a.type) === "optimization").length
 
+  // Handlers (Mock)
   const handleDismiss = (id: string) => {
-    setAlerts(safeAlerts.filter((a) => a.id !== id))
+    setAlerts(prev => prev.filter((a) => a.id !== id))
   }
 
   const handleAcknowledge = (id: string) => {
-    // In real app, this would update the alert status
-    console.log("Acknowledged:", id)
+    console.log("Acknowledged Event ID:", id)
+    // ในโปรเจคจริงอาจยิง API กลับไปเพื่อ update status
   }
 
   return (
@@ -137,12 +191,12 @@ export function AlertsPage() {
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="gap-1">
             <Bell className="h-3 w-3" />
-            {safeAlerts.length} Active
+            {alerts.length} Active
           </Badge>
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -152,7 +206,7 @@ export function AlertsPage() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-chart-4">{highCount}</div>
+            <div className="text-2xl font-bold text-orange-500">{highCount}</div>
             <p className="text-xs text-muted-foreground">High Priority</p>
           </CardContent>
         </Card>
@@ -185,7 +239,7 @@ export function AlertsPage() {
         <CardContent>
           <Tabs defaultValue="all" className="w-full" onValueChange={setSelectedType}>
             <TabsList className="mb-4">
-              <TabsTrigger value="all">All ({safeAlerts.length})</TabsTrigger>
+              <TabsTrigger value="all">All ({alerts.length})</TabsTrigger>
               <TabsTrigger value="anomaly">Anomaly ({anomalyCount})</TabsTrigger>
               <TabsTrigger value="prediction">Prediction ({predictionCount})</TabsTrigger>
               <TabsTrigger value="optimization">Optimization ({optimizationCount})</TabsTrigger>
@@ -194,9 +248,10 @@ export function AlertsPage() {
             <TabsContent value={selectedType} className="mt-0">
               <div className="space-y-4">
                 {filteredAlerts.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <CheckCircle className="h-12 w-12 mx-auto mb-2 text-success" />
-                    <p>No alerts in this category</p>
+                  <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                    <CheckCircle className="h-12 w-12 mx-auto mb-2 text-muted-foreground/50" />
+                    <p className="text-muted-foreground">No alerts in this category</p>
+                    <p className="text-xs text-muted-foreground mt-1">System is running normally</p>
                   </div>
                 ) : (
                   filteredAlerts.map((alert) => {
@@ -204,50 +259,68 @@ export function AlertsPage() {
                     return (
                       <div
                         key={alert.id}
-                        className={cn("rounded-lg border p-4 transition-all", styles.bg, styles.border)}
+                        className={cn("rounded-lg border p-4 transition-all hover:bg-accent/5", styles.bg, styles.border)}
                       >
                         <div className="flex items-start gap-4">
-                          <div className={cn("p-2 rounded-lg bg-background", styles.text)}>
+                          <div className={cn("p-2 rounded-lg bg-background shadow-sm", styles.text)}>
                             {getAlertIcon(alert.type)}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <div>
-                                <h4 className="font-semibold text-foreground">{alert.title}</h4>
+                                <h4 className="font-semibold text-foreground flex items-center gap-2">
+                                  {alert.title}
+                                  {alert.severity === 'critical' && (
+                                     <span className="flex h-2 w-2 rounded-full bg-destructive animate-pulse" />
+                                  )}
+                                </h4>
                                 <p className="text-sm text-muted-foreground mt-1">{alert.description}</p>
                               </div>
-                              <Badge className={styles.badge}>{alert.severity}</Badge>
+                              <Badge className={cn("uppercase text-[10px]", styles.badge)}>
+                                {alert.severity}
+                              </Badge>
                             </div>
+
+                            {/* AI Response Section */}
+                            {alert.aiResponse && (
+                                <div className="mt-3 bg-background/50 p-2 rounded text-sm border border-border/50 flex gap-2">
+                                    <Brain className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                                    <span className="text-primary-foreground/80 text-xs md:text-sm">
+                                        <span className="font-semibold text-primary">AI Action:</span> {alert.aiResponse}
+                                    </span>
+                                </div>
+                            )}
+
                             <div className="flex items-center gap-4 mt-3">
                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Clock className="h-3 w-3" />
                                 {formatTime(alert.timestamp)}
                               </div>
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Brain className="h-3 w-3" />
-                                AI Confidence: {alert.aiConfidence}%
-                              </div>
-                              <Badge variant="outline" className="text-xs capitalize">
-                                {alert.type}
+                              <Badge variant="outline" className="text-xs capitalize bg-background">
+                                Type: {alert.type.replace('_', ' ')}
                               </Badge>
                             </div>
                           </div>
-                          <div className="flex gap-1">
+                          
+                          {/* Actions */}
+                          <div className="flex flex-col gap-1">
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8"
+                              className="h-8 w-8 hover:text-success hover:bg-success/10"
                               onClick={() => handleAcknowledge(alert.id)}
+                              title="Acknowledge"
                             >
-                              <CheckCircle className="h-4 w-4 text-success" />
+                              <CheckCircle className="h-4 w-4" />
                             </Button>
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8"
+                              className="h-8 w-8 hover:text-destructive hover:bg-destructive/10"
                               onClick={() => handleDismiss(alert.id)}
+                              title="Dismiss"
                             >
-                              <X className="h-4 w-4 text-muted-foreground" />
+                              <X className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
