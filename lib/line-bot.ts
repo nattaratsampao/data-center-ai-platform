@@ -96,13 +96,17 @@ export async function formatSystemStatusForLine(): Promise<string> {
       cache: "no-store",
     })
 
+    if (!response.ok) {
+      throw new Error("Failed to fetch data")
+    }
+
     const data = await response.json()
 
     return `📊 รายงานสถานะ Data Center
 
 🖥️ เซิร์ฟเวอร์: ${data.stats.onlineServers}/${data.stats.totalServers} ออนไลน์
-🌡️ อุณหภูมิเฉลี่ย: ${data.stats.avgTemperature}°C
-⚡ การใช้พลังงาน: ${data.stats.powerUsage}%
+🌡️ อุณหภูมิเฉลี่ย: ${data.stats.avgTemperature.toFixed(1)}°C
+⚡ การใช้พลังงาน: ${data.stats.powerUsage.toFixed(1)}%
 🔄 Uptime: ${data.stats.uptime.toFixed(2)}%
 
 ${data.stats.onlineServers === data.stats.totalServers ? "✅ ระบบทั้งหมดทำงานปกติ" : "⚠️ เซิร์ฟเวอร์บางตัวออฟไลน์"}
@@ -111,6 +115,6 @@ ${data.stats.onlineServers === data.stats.totalServers ? "✅ ระบบทั
 พิมพ์ "ช่วยเหลือ" เพื่อดูคำสั่งทั้งหมด`
   } catch (error) {
     console.error("Error fetching system status:", error)
-    return "❌ ไม่สามารถดึงข้อมูลได้ในขณะนี้"
+    return "❌ ไม่สามารถดึงข้อมูลได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง"
   }
 }
