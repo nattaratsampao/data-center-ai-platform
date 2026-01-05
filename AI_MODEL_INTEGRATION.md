@@ -220,7 +220,7 @@ def predict_with_onnx(features):
 
 ## หมายเหตุ
 
-- ตอนนี้ระบบใช้ **simulation** เพื่อแสดง prototype
+- ตอนนี้ระบบใช้ **simulation** เพื่อ���สดง prototype
 - เมื่อ models พร้อมแล้ว เพียงแค่แทนที่ functions ใน `app/api/ai/predict/route.ts`
 - ระบบรองรับ real-time data updates ทุก 3 วินาที
 - ค่าต่างๆ จะเปลี่ยนแปลงตาม workload patterns จริง
