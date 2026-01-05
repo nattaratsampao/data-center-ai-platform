@@ -20,9 +20,9 @@ export function SettingsPage() {
   const [powerThreshold, setPowerThreshold] = useState([80])
   const [lineNotifyEnabled, setLineNotifyEnabled] = useState(false)
   const [lineNotifyToken, setLineNotifyToken] = useState("")
-  const [lineBotEnabled, setLineBotEnabled] = useState(true)
-  const [lineChannelAccessToken, setLineChannelAccessToken] = useState("XUuj+bHq21H40eIheTp7VzzP5bQufdtwD3c0VYYvS6CaTV2evII8kNaEgqah/rRJ6pZa1IKMoY4ym2FfOcgUWw04m1hm7SPP/03CsapI97Y51sNsyhNOOweERoAbgbR0tyfk4Kn4Vofu8v1MRZycLwdB04t89/1O/w1cDnyilFU=")
-  const [lineChannelSecret, setLineChannelSecret] = useState("e494662992f69b8a117272368a8eec70")
+  const [lineBotEnabled, setLineBotEnabled] = useState(false)
+  const [lineChannelAccessToken, setLineChannelAccessToken] = useState("")
+  const [lineChannelSecret, setLineChannelSecret] = useState("")
   const [isSendingTest, setIsSendingTest] = useState(false)
   const { toast } = useToast()
 
@@ -38,6 +38,46 @@ export function SettingsPage() {
 
     setIsSendingTest(true)
     try {
+      const realtimeResponse = await fetch("/api/realtime/data")
+      const realtimeData = await realtimeResponse.json()
+
+      // Calculate temperature stats
+      let tempStats = ""
+      if (realtimeData?.sensors) {
+        const tempSensors = realtimeData.sensors.filter((s: any) => s.type === "temperature")
+        if (tempSensors.length > 0) {
+          const temps = tempSensors.map((s: any) => s.value)
+          const avgTemp = (temps.reduce((a: number, b: number) => a + b, 0) / temps.length).toFixed(1)
+          const maxTemp = Math.max(...temps).toFixed(1)
+          const minTemp = Math.min(...temps).toFixed(1)
+
+          tempStats = `
+
+🌡️ สถานะอุณหภูมิ
+อุณหภูมิเฉลี่ย: ${avgTemp}°C
+อุณหภูมิสูงสุด: ${maxTemp}°C
+อุณหภูมิต่ำสุด: ${minTemp}°C
+${Number.parseFloat(avgTemp) > 30 ? "⚠️ อุณหภูมิสูงกว่าปกติ" : "✅ อุณหภูมิปกติ"}`
+        }
+      }
+
+      // Calculate server stats
+      let serverStats = ""
+      if (realtimeData?.servers) {
+        const onlineServers = realtimeData.servers.filter((s: any) => s.status === "online").length
+        const totalServers = realtimeData.servers.length
+        const avgCPU = (
+          realtimeData.servers.reduce((sum: number, s: any) => sum + s.cpuUsage, 0) / totalServers
+        ).toFixed(1)
+
+        serverStats = `
+
+💻 สถานะเซิร์ฟเวอร์
+ออนไลน์: ${onlineServers}/${totalServers} เครื่อง
+CPU เฉลี่ย: ${avgCPU}%
+${Number.parseFloat(avgCPU) > 80 ? "⚠️ CPU ใช้งานสูง" : "✅ CPU ปกติ"}`
+      }
+
       const response = await fetch("/api/line-notify", {
         method: "POST",
         headers: {
@@ -45,7 +85,11 @@ export function SettingsPage() {
         },
         body: JSON.stringify({
           token: lineNotifyToken,
-          message: `🔔 Test Alert from Data Center AI\n\nThis is a test notification from your Data Center Monitoring System.\n\nTime: ${new Date().toLocaleString("th-TH")}\nStatus: System OK ✅`,
+          message: `🔔 ทดสอบการแจ้งเตือนจาก Data Center AI
+
+✅ ระบบทำงานปกติ${tempStats}${serverStats}
+
+⏰ เวลา: ${new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}`,
         }),
       })
 

@@ -84,7 +84,7 @@ export function AlertsList({ alerts }: AlertsListProps) {
     }
 
     try {
-      const message = formatAlertForLine(alert)
+      const message = await formatAlertForLine(alert)
       const response = await fetch("/api/line-notify", {
         method: "POST",
         headers: {
