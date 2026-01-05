@@ -1,111 +1,139 @@
 "use client"
 
-import { useMemo } from "react"
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
-
-// กำหนด Interface ให้ตรงกับข้อมูลที่ส่งมาจาก API Route
-interface Server {
-  id: string
-  name: string
-  rack: string
-  status: string
-  cpu: number
-  temperature: number
-  healthScore: number
-}
+import { cn } from "@/lib/utils"
+import type { ServerData } from "@/lib/mock-data"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Badge } from "@/components/ui/badge"
 
 interface ServerHeatmapProps {
-  servers: Server[]
+  servers: ServerData[]
 }
 
-export function ServerHeatmap({ servers = [] }: ServerHeatmapProps) {
-  // ✅ แก้ไข 1: ใช้ชื่อ Rack เป็น "A", "B", "C" เพื่อให้นำไปเช็คได้ครอบคลุม
-  const racks = ["A", "B", "C"]
+function getHeatColor(value: number): string {
+  if (value >= 80) return "bg-destructive"
+  if (value >= 60) return "bg-warning"
+  if (value >= 40) return "bg-chart-3"
+  return "bg-success"
+}
 
-  // ฟังก์ชันเลือกสีตามความร้อนแรงของ CPU
-  const getCellColor = (server: Server) => {
-    if (server.status !== "online" && server.status !== "warning") return "bg-slate-800 border-slate-700" // Offline
-    
-    const cpu = server.cpu
-    // ไล่เฉดสี: เขียว -> เหลือง -> ส้ม -> แดง
-    if (cpu >= 90) return "bg-red-500 hover:bg-red-400"
-    if (cpu >= 70) return "bg-orange-500 hover:bg-orange-400"
-    if (cpu >= 50) return "bg-yellow-500 hover:bg-yellow-400"
-    if (cpu >= 30) return "bg-emerald-500 hover:bg-emerald-400"
-    return "bg-emerald-600 hover:bg-emerald-500"
+function getStatusBadge(status: ServerData["status"]) {
+  switch (status) {
+    case "online":
+      return (
+        <Badge variant="outline" className="bg-success/20 text-success border-success/30">
+          Online
+        </Badge>
+      )
+    case "warning":
+      return (
+        <Badge variant="outline" className="bg-warning/20 text-warning border-warning/30">
+          Warning
+        </Badge>
+      )
+    case "offline":
+      return (
+        <Badge variant="outline" className="bg-destructive/20 text-destructive border-destructive/30">
+          Offline
+        </Badge>
+      )
   }
+}
+
+export function ServerHeatmap({ servers }: ServerHeatmapProps) {
+  const racks = ["Rack A", "Rack B", "Rack C"]
 
   return (
-    <div className="space-y-6">
-      {racks.map((rackId) => {
-        // ✅ แก้ไข 2: กรองข้อมูลแบบยืดหยุ่น (รับได้ทั้ง "A" และ "Rack A")
-        const rackServers = servers.filter(
-          (s) => s.rack === rackId || s.rack === `Rack ${rackId}`
-        )
-
-        return (
-          <div key={rackId} className="flex flex-col sm:flex-row sm:items-center gap-4">
-            {/* ชื่อ Rack */}
-            <div className="w-20 shrink-0 font-medium text-sm text-muted-foreground">
-              Rack {rackId}
-            </div>
-
-            {/* Grid แสดง Server เป็นช่องๆ (Heatmap) */}
-            <div className="flex-1 grid grid-cols-10 gap-1.5 p-2 bg-secondary/20 rounded-lg border border-border/50">
-              {rackServers.length > 0 ? (
-                rackServers.map((server) => (
-                  <HoverCard key={server.id} openDelay={0} closeDelay={0}>
-                    <HoverCardTrigger asChild>
+    <TooltipProvider>
+      <div className="space-y-4">
+        {racks.map((rack) => {
+          const rackServers = servers.filter((s) => s.rack === rack)
+          return (
+            <div key={rack} className="space-y-2">
+              <h4 className="text-sm font-medium text-muted-foreground">{rack}</h4>
+              <div className="grid grid-cols-4 gap-2">
+                {rackServers.map((server) => (
+                  <Tooltip key={server.id}>
+                    <TooltipTrigger asChild>
                       <div
-                        className={`
-                          aspect-square rounded-sm border cursor-pointer transition-all duration-200
-                          ${getCellColor(server)}
-                          ${server.status === 'warning' ? 'animate-pulse ring-2 ring-yellow-500/50' : ''}
-                          ${server.status === 'critical' ? 'animate-pulse ring-2 ring-red-500/50' : ''}
-                        `}
-                      />
-                    </HoverCardTrigger>
-                    
-                    {/* Tooltip ตอนเอาเมาส์ชี้ */}
-                    <HoverCardContent className="w-64 p-3 z-50" side="top">
+                        className={cn(
+                          "relative h-20 rounded-lg border border-border p-2 cursor-pointer transition-all hover:scale-105",
+                          server.status === "offline" ? "bg-muted opacity-50" : "bg-card",
+                        )}
+                      >
+                        <div className="text-xs font-medium truncate">{server.name}</div>
+                        {server.status !== "offline" && (
+                          <>
+                            <div className="mt-2 space-y-1">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-muted-foreground w-8">CPU</span>
+                                <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                                  <div
+                                    className={cn("h-full rounded-full transition-all", getHeatColor(server.cpu))}
+                                    style={{ width: `${server.cpu}%` }}
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-muted-foreground w-8">MEM</span>
+                                <div className="flex-1 h-1.5 bg-secondary rounded-full overflow-hidden">
+                                  <div
+                                    className={cn("h-full rounded-full transition-all", getHeatColor(server.memory))}
+                                    style={{ width: `${server.memory}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                            {server.predictedFailure && (
+                              <div className="absolute top-1 right-1">
+                                <div className="h-2 w-2 rounded-full bg-warning animate-pulse" />
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="w-48">
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <h4 className="font-semibold text-sm">{server.name}</h4>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            server.status === 'online' ? 'bg-emerald-500/20 text-emerald-500' : 
-                            server.status === 'warning' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-red-500/20 text-red-500'
-                          }`}>
-                            {server.status.toUpperCase()}
-                          </span>
+                          <span className="font-semibold">{server.name}</span>
+                          {getStatusBadge(server.status)}
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                          <div>CPU: <span className="text-foreground">{server.cpu}%</span></div>
-                          <div>Temp: <span className="text-foreground">{server.temperature}°C</span></div>
-                          <div>Health: <span className="text-foreground">{server.healthScore}%</span></div>
-                        </div>
+                        {server.status !== "offline" && (
+                          <>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <span className="text-muted-foreground">CPU:</span>{" "}
+                                <span className="font-medium">{server.cpu}%</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Memory:</span>{" "}
+                                <span className="font-medium">{server.memory}%</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Disk:</span>{" "}
+                                <span className="font-medium">{server.disk}%</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Health:</span>{" "}
+                                <span className="font-medium">{server.healthScore}%</span>
+                              </div>
+                            </div>
+                            {server.predictedFailure && (
+                              <div className="text-xs text-warning">
+                                ⚠️ Predicted failure in {server.predictedFailure} days
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
-                    </HoverCardContent>
-                  </HoverCard>
-                ))
-              ) : (
-                // กรณีไม่มี Server
-                <div className="col-span-10 text-xs text-muted-foreground text-center py-2">
-                  No servers found in Rack {rackId}
-                </div>
-              )}
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
             </div>
-          </div>
-        )
-      })}
-
-      {/* คำอธิบายสี */}
-      <div className="flex items-center justify-end gap-4 text-xs text-muted-foreground mt-4 pt-4 border-t">
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-emerald-600"></div>Idle</div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-emerald-500"></div>Normal</div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-yellow-500"></div>Load</div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-orange-500"></div>High</div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-red-500"></div>Critical</div>
+          )
+        })}
       </div>
-    </div>
+    </TooltipProvider>
   )
 }
