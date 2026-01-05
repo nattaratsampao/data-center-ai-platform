@@ -31,18 +31,15 @@ export async function GET(request: Request) {
   const activeEvents = getActiveEvents()
 
   // -------------------------------------------------------
-  // 🔗 ส่วนที่แก้: เปลี่ยน URL ให้รองรับทั้ง Local และ Vercel
+  // 🔗 ส่วนเชื่อมต่อ Python API (รองรับ Local & Vercel)
   // -------------------------------------------------------
   
-  // หา Base URL ของเว็บตัวเอง (Localhost หรือ Vercel URL)
+  // หา Base URL อัตโนมัติ
   const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
   const host = request.headers.get('host') || 'localhost:3000';
-  
-  // เรียกผ่าน /api/python (ที่เราตั้ง Rewrite ไว้ใน next.config.mjs)
   const PYTHON_API_URL = `${protocol}://${host}/api/python`;
 
   try {
-    // ยิงไปที่ /api/python/predict -> มันจะวิ่งไปหาไฟล์ api/index.py ฟังก์ชัน predict
     const aiResponse = await fetch(`${PYTHON_API_URL}/predict`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -61,12 +58,12 @@ export async function GET(request: Request) {
           if (pred) {
             return {
               ...server,
-              healthScore: Math.round(pred.newHealthScore), // คะแนนจาก AI
+              healthScore: Math.round(pred.newHealthScore),
               
               // เพิ่ม Field พิเศษเพื่อนำไปแสดงผล
               predictionInfo: {
                 isAnomaly: pred.isAnomaly,
-                failureType: pred.failureType || "None", // กัน error ถ้าไม่มีค่า
+                failureType: pred.failureType || "None",
                 maintenanceDays: Math.round(pred.maintenanceDays || 0)
               }
             }
@@ -74,21 +71,23 @@ export async function GET(request: Request) {
           return server
         })
       }
+    } else {
+        // กรณีเชื่อมต่อได้แต่ Python ตอบกลับมาว่า Error
+        console.error("⚠️ AI Server Error Status:", aiResponse.status);
     }
   } catch (error) {
-    // ถ้า Python ไม่รัน หรือ Vercel Cold Start ไม่ทัน ก็ใช้ค่าเดิมไปก่อน (User ไม่รู้ตัว)
-    // console.warn("AI Server not connected:", error) 
+    // 🔴 เปิด Error Log ให้เห็นชัดๆ ใน Vercel Dashboard
+    console.error("🔥 AI CONNECTION FAILED:", error);
   }
   // -------------------------------------------------------
 
-  // คำนวณ Stats (เหมือนเดิม)
+  // คำนวณ Stats
   const avgTemp = Math.round((servers.reduce((sum, s) => sum + s.temperature, 0) / servers.length) * 10) / 10
   const totalPower = sensors.find(s => s.type === "power")?.value || 0;
+  const predictiveCount = servers.filter((s: any) => s.predictionInfo && s.predictionInfo.maintenanceDays < 14).length
 
-  // นับจำนวน Predictive Alerts (Server ที่ต้องซ่อมใน < 14 วัน)
-  const predictiveCount = servers.filter((s: any) => 
-    s.predictionInfo && s.predictionInfo.maintenanceDays < 14
-  ).length
+  // ✅ เช็คว่า AI ทำงานจริงไหม? (ดูจากว่า Server ตัวแรกมี predictionInfo แปะมาไหม)
+  const isAIActive = servers.length > 0 && servers[0].hasOwnProperty('predictionInfo');
 
   return NextResponse.json({
     timestamp: new Date().toISOString(),
@@ -103,12 +102,14 @@ export async function GET(request: Request) {
         powerUsage: Math.round(totalPower * 1.5),
         pue: 1.45,
     },
-    // ส่งข้อมูล AI Insight ไปโชว์กราฟ
     aiInsights: {
         anomalyDetected: servers.some((s: any) => s.predictionInfo?.isAnomaly),
         predictiveAlerts: predictiveCount, 
         optimizationsSuggested: Math.floor(Math.random() * 5) + 1,
-        confidenceScore: 98.5, // มั่นใจเพราะใช้ Model จริง
+        
+        // ✨ ถ้า AI ทำงานโชว์ 99.9% ถ้าไม่ทำงานโชว์ 85.5% (ดูง่าย!)
+        confidenceScore: isAIActive ? 99.9 : 85.5, 
+        
         maintenanceScore: 88.0,
         loadBalancingScore: 92.0
     }
