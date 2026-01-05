@@ -8,7 +8,7 @@
       "features": ["temperature", "humidity", "power_consumption", "vibration"],
       "hyperparameters": {
         "n_estimators": 100,
-        "contamination": 0.05,
+        "contamination": 0.15, 
         "max_features": 1.0
       },
       "evaluation_metrics": ["precision", "recall", "f1_score", "roc_auc"]
@@ -31,20 +31,31 @@
         "max_depth": 6,
         "learning_rate": 0.1,
         "n_estimators": 200,
-        "scale_pos_weight": 4
+        "scale_pos_weight": 3
       },
       "evaluation_metrics": ["accuracy", "precision", "recall", "f1_score"]
     },
     {
       "name": "Failure Type Classifier",
-      "type": "random_forest_classifier",
+      "type": "xgboost_classifier", 
       "dataset": "failure_events.csv",
       "target": "failure_type",
-      "features": ["pre_cpu_avg", "pre_memory_avg", "pre_temperature_avg", "pre_vibration_avg", "pre_error_rate"],
+      "features": [
+        "pre_cpu_avg", 
+        "pre_memory_avg", 
+        "pre_temperature_avg", 
+        "pre_vibration_avg", 
+        "pre_error_rate",
+        "pre_network_latency",
+        "pre_voltage_fluctuation",
+        "pre_disk_io_wait"
+      ],
       "hyperparameters": {
-        "n_estimators": 150,
-        "max_depth": 10,
-        "min_samples_split": 5
+        "n_estimators": 300,
+        "max_depth": 6,
+        "learning_rate": 0.05,
+        "objective": "multi:softprob",
+        "num_class": 8
       },
       "evaluation_metrics": ["accuracy", "confusion_matrix", "classification_report"]
     },

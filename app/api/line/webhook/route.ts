@@ -7,6 +7,47 @@ function verifySignature(body: string, signature: string, channelSecret: string)
   return hash === signature
 }
 
+interface Server {
+  id: string
+  name: string
+  cpu: number
+  memory: number
+  temperature: number
+  network: number
+  status: string
+  healthScore: number
+}
+
+interface TemperatureSensor {
+  id: string
+  value: number
+  status: string
+}
+
+interface RealtimeData {
+  stats: {
+    totalServers: number
+    onlineServers: number
+    avgTemperature: number
+    avgCPU: number
+    powerUsage: number
+    pue: number
+    uptime: number
+  }
+  servers: Server[]
+  sensors: {
+    temperature: TemperatureSensor[]
+    humidity: Array<{ id: string; value: number; status: string }>
+    power: { total: number; servers: number; cooling: number }
+  }
+  aiInsights: {
+    anomalyDetected: boolean
+    predictiveAlerts: number
+    optimizationsSuggested: number
+    confidenceScore: number
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const signature = request.headers.get("x-line-signature")
@@ -80,9 +121,8 @@ async function handleTextMessage(event: any) {
 
 ${realtimeData.stats.onlineServers === realtimeData.stats.totalServers ? "✅ ระบบทั้งหมดทำงานปกติ" : "⚠️ เซิร์ฟเวอร์บางตัวต้องการความสนใจ"}`
   } else if (userMessage.includes("alert") || userMessage.includes("แจ้งเตือน")) {
-    // 🔥 แก้ไข 1: เพิ่ม : any ให้ s
-    const criticalServers = realtimeData.servers.filter((s: any) => s.status === "critical")
-    const warningServers = realtimeData.servers.filter((s: any) => s.status === "warning")
+    const criticalServers = realtimeData.servers.filter((s: Server) => s.status === "critical")
+    const warningServers = realtimeData.servers.filter((s: Server) => s.status === "warning")
 
     replyMessage = `🚨 การแจ้งเตือนล่าสุด
 
@@ -91,18 +131,15 @@ ${warningServers.length > 0 ? `⚠️ Warning: ${warningServers.length} เซ�
 
 ${criticalServers.length === 0 && warningServers.length === 0 ? "✅ ไม่มีการแจ้งเตือนในขณะนี้" : ""}
 
-${criticalServers.map((s: any) => `• ${s.name}: CPU ${s.cpu}%`).join("\n")}
-${warningServers.map((s: any) => `• ${s.name}: CPU ${s.cpu}%`).join("\n")}
+${criticalServers.map((s: Server) => `• ${s.name}: CPU ${s.cpu}%`).join("\n")}
+${warningServers.map((s: Server) => `• ${s.name}: CPU ${s.cpu}%`).join("\n")}
 
 พิมพ์ "ช่วยเหลือ" เพื่อดูคำสั่งเพิ่มเติม`
   } else if (userMessage.includes("temperature") || userMessage.includes("อุณหภูมิ")) {
     const temps = realtimeData.sensors.temperature
-    // 🔥 แก้ไข 2: เพิ่ม : any ให้ sum และ t
-    const avgTemp = (temps.reduce((sum: any, t: any) => sum + t.value, 0) / temps.length).toFixed(1)
-    
-    // 🔥 แก้ไข 3: เพิ่ม : any ให้ t
-    const maxTemp = Math.max(...temps.map((t: any) => t.value)).toFixed(1)
-    const minTemp = Math.min(...temps.map((t: any) => t.value)).toFixed(1)
+    const avgTemp = (temps.reduce((sum: number, t: TemperatureSensor) => sum + t.value, 0) / temps.length).toFixed(1)
+    const maxTemp = Math.max(...temps.map((t: TemperatureSensor) => t.value)).toFixed(1)
+    const minTemp = Math.min(...temps.map((t: TemperatureSensor) => t.value)).toFixed(1)
 
     replyMessage = `🌡️ สถานะอุณหภูมิ
 
@@ -110,7 +147,7 @@ ${warningServers.map((s: any) => `• ${s.name}: CPU ${s.cpu}%`).join("\n")}
 อุณหภูมิสูงสุด: ${maxTemp}°C
 อุณหภูมิต่ำสุด: ${minTemp}°C
 
-${temps.filter((t: any) => t.status === "warning").length > 0 ? "⚠️ มี Sensor บางตัวแสดงค่าสูง" : "✅ ระบบทำความเย็นทำงานปกติ"}`
+${temps.filter((t: TemperatureSensor) => t.status === "warning").length > 0 ? "⚠️ มี Sensor บางตัวแสดงค่าสูง" : "✅ ระบบทำความเย็นทำงานปกติ"}`
   } else if (userMessage.includes("help") || userMessage.includes("ช่วยเหลือ")) {
     replyMessage = `🤖 ผู้ช่วย Data Center AI
 
@@ -135,10 +172,9 @@ PUE: ${realtimeData.stats.pue}
 เซิร์ฟเวอร์: ${power.servers} kW
 ระบบทำความเย็น: ${power.cooling} kW`
   } else if (userMessage.includes("servers") || userMessage.includes("เซิร์ฟเวอร์")) {
-    // 🔥 แก้ไข 4: เพิ่ม : any ให้ s
-    const excellentCount = realtimeData.servers.filter((s: any) => s.healthScore >= 90).length
-    const goodCount = realtimeData.servers.filter((s: any) => s.healthScore >= 80 && s.healthScore < 90).length
-    const warningCount = realtimeData.servers.filter((s: any) => s.healthScore < 80).length
+    const excellentCount = realtimeData.servers.filter((s: Server) => s.healthScore >= 90).length
+    const goodCount = realtimeData.servers.filter((s: Server) => s.healthScore >= 80 && s.healthScore < 90).length
+    const warningCount = realtimeData.servers.filter((s: Server) => s.healthScore < 80).length
 
     replyMessage = `🖥️ สุขภาพเซิร์ฟเวอร์
 
@@ -243,7 +279,7 @@ async function replyToUser(replyToken: string, message: string) {
   }
 }
 
-async function fetchRealtimeData() {
+async function fetchRealtimeData(): Promise<RealtimeData> {
   try {
     const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"
 
