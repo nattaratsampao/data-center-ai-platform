@@ -3,4 +3,4 @@ flask-cors
 joblib
 scikit-learn
 numpy
-pandas
+# pandas  <-- ลบตัวนี้ทิ้ง!
