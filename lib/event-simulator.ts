@@ -516,4 +516,4 @@ export function updateSimulation() {
 
   // Possibly generate new event
   return generateRandomEvent()
-}   
+}
