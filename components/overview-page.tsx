@@ -11,15 +11,19 @@ import { TemperatureChart } from "./charts/temperature-chart"
 import { PowerChart } from "./charts/power-chart"
 import { ServerHeatmap } from "./server-heatmap"
 import { AlertsList } from "./alerts-list"
-import { generateAlerts } from "@/lib/mock-data"
+
+// ❌ ไม่ต้อง import generateAlerts แล้ว
+// import { generateAlerts } from "@/lib/mock-data"
 
 export function OverviewPage() {
   const [realtimeData, setRealtimeData] = useState<any>(null)
-  const [alerts, setAlerts] = useState(generateAlerts())
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [newEventsCount, setNewEventsCount] = useState(0)
+
+  // ❌ ลบ State alerts ที่เป็น Mock ทิ้งไป
+  // const [alerts, setAlerts] = useState(generateAlerts())
 
   useEffect(() => {
     loadRealtimeData()
@@ -33,6 +37,14 @@ export function OverviewPage() {
   const loadRealtimeData = async () => {
     try {
       const data = await fetchRealtimeData()
+
+      // ✅ แปลง Timestamp ของ Events ให้เป็น Date Object เพื่อให้ AlertsList ใช้งานได้
+      if (data.activeEvents) {
+        data.activeEvents = data.activeEvents.map((e: any) => ({
+          ...e,
+          timestamp: new Date(e.timestamp)
+        }));
+      }
 
       if (realtimeData?.activeEvents && data.activeEvents) {
         const newEvents = data.activeEvents.length - realtimeData.activeEvents.length
@@ -51,7 +63,7 @@ export function OverviewPage() {
   const handleRefresh = async () => {
     setIsRefreshing(true)
     await loadRealtimeData()
-    setAlerts(generateAlerts())
+    // ❌ ไม่ต้อง setAlerts(generateAlerts()) แล้ว
     setTimeout(() => setIsRefreshing(false), 500)
   }
 
@@ -68,7 +80,7 @@ export function OverviewPage() {
 
   const { servers, stats, aiInsights, activeEvents } = realtimeData
   
-  // ⚠️ จุดที่แก้: ดึงค่า Power จาก Array sensors (หาตัวที่มี type = 'power')
+  // ดึงค่า Power จาก Array sensors
   const powerSensor = Array.isArray(realtimeData.sensors) 
     ? realtimeData.sensors.find((s: any) => s.type === 'power') 
     : { value: 0 };
@@ -153,7 +165,6 @@ export function OverviewPage() {
             <Zap className="h-4 w-4 text-chart-3" />
           </CardHeader>
           <CardContent>
-            {/* ⚠️ จุดที่แก้: ใช้ตัวแปร totalPower ที่เราดึงมาข้างบน แทนการเรียก object ซ้อนๆ */}
             <div className="text-2xl font-bold">{totalPower} kW</div>
             <div className="flex items-center text-xs text-success">
               <TrendingUp className="h-3 w-3 mr-1" />
@@ -168,7 +179,8 @@ export function OverviewPage() {
             <AlertTriangle className="h-4 w-4 text-chart-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{activeEvents?.length || alerts.length}</div>
+            {/* ✅ ใช้ activeEvents.length แทน alerts.length */}
+            <div className="text-2xl font-bold">{activeEvents?.length || 0}</div>
             {criticalEvents > 0 && <p className="text-xs text-destructive">{criticalEvents} วิกฤต</p>}
           </CardContent>
         </Card>
@@ -227,12 +239,13 @@ export function OverviewPage() {
             <CardDescription>การแจ้งเตือนและการทำนายล่าสุด</CardDescription>
           </CardHeader>
           <CardContent>
-            <AlertsList alerts={alerts.slice(0, 4)} />
+            {/* ✅ จุดสำคัญ: ส่ง activeEvents จริงๆ เข้าไปใน AlertsList แทน mock alerts */}
+            <AlertsList alerts={activeEvents ? activeEvents.slice(0, 4) : []} />
           </CardContent>
         </Card>
       </div>
 
-      {/* AI Stats ... (ส่วนล่างเหมือนเดิมครับ ไม่มีการเปลี่ยนแปลงโครงสร้างข้อมูล) */}
+      {/* AI Stats (ส่วนล่างยังเหมือนเดิม) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -271,7 +284,7 @@ export function OverviewPage() {
         </CardContent>
       </Card>
 
-      {/* Active Events Section */}
+      {/* Active Events Section (ส่วนล่างสุด ใช้ activeEvents อยู่แล้ว จึงถูกต้อง) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -312,7 +325,10 @@ export function OverviewPage() {
                       )}
                     </div>
                     <span className="text-xs text-muted-foreground whitespace-nowrap ml-4">
-                      {new Date(event.timestamp).toLocaleTimeString("th-TH")}
+                      {event.timestamp instanceof Date 
+                        ? event.timestamp.toLocaleTimeString("th-TH") 
+                        : new Date(event.timestamp).toLocaleTimeString("th-TH")
+                      }
                     </span>
                   </div>
                 </div>
