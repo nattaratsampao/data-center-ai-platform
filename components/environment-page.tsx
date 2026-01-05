@@ -1,15 +1,25 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Thermometer, Droplets, Zap, Vibrate, RefreshCw, AlertTriangle } from "lucide-react"
+import { 
+  Thermometer, 
+  Droplets, 
+  Zap, 
+  Vibrate, 
+  RefreshCw, 
+  AlertTriangle, 
+  Loader2, 
+  Activity // <--- เพิ่มตรงนี้แล้วครับ
+} from "lucide-react"
 import { generateSensorData, type SensorData } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 
-// ... (function getStatusColor, getStatusBg, getSensorIcon เหมือนเดิม ไม่ต้องแก้) ...
+// --- Helper Functions ---
+
 function getStatusColor(status: SensorData["status"]) {
   switch (status) {
     case "normal":
@@ -18,6 +28,8 @@ function getStatusColor(status: SensorData["status"]) {
       return "text-warning"
     case "critical":
       return "text-destructive"
+    default:
+      return "text-muted-foreground"
   }
 }
 
@@ -29,6 +41,8 @@ function getStatusBg(status: SensorData["status"]) {
       return "bg-warning/10 border-warning/30"
     case "critical":
       return "bg-destructive/10 border-destructive/30"
+    default:
+      return "bg-muted/10 border-muted/30"
   }
 }
 
@@ -42,71 +56,97 @@ function getSensorIcon(type: SensorData["type"]) {
       return <Zap className="h-5 w-5" />
     case "vibration":
       return <Vibrate className="h-5 w-5" />
+    default:
+      return <Activity className="h-5 w-5" />
   }
 }
-// ... จบส่วน function ช่วยเหลือ ...
+
+// --- Main Component ---
 
 export function EnvironmentPage() {
-  // ✅ แก้ไข: กำหนดค่าเริ่มต้นเป็น Array ว่างเสมอ
-  const [sensors, setSensors] = useState<SensorData[]>([]) 
+  const [sensors, setSensors] = useState<SensorData[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedType, setSelectedType] = useState<string>("all")
 
-  // ✅ ฟังก์ชันช่วยแปลงข้อมูล (ป้องกัน Error เรื่อง Date และ Array)
-  const processData = (rawData: any) => {
-    // เช็คว่า rawData.sensors มีจริงไหม และเป็น Array ไหม
-    const list = Array.isArray(rawData?.sensors) ? rawData.sensors : []
-    
-    // แปลงวันที่ string เป็น Date Object เพื่อให้ .toLocaleTimeString() ทำงานได้
-    return list.map((item: any) => ({
-      ...item,
-      lastUpdated: new Date(item.lastUpdated)
-    }))
-  }
-
-  useEffect(() => {
-    const fetchRealtimeData = async () => {
-      try {
-        const response = await fetch("/api/realtime/data")
-        const data = await response.json()
-        
-        // ✅ ใช้ processData ก่อน set
-        setSensors(processData(data)) 
-
-      } catch (error) {
-        console.error("[v0] Failed to fetch realtime sensor data:", error)
-        // กรณี Error ให้ใช้ Mock Data
-        setSensors(generateSensorData())
-      }
-    }
-
-    fetchRealtimeData()
-    const interval = setInterval(fetchRealtimeData, 3000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
+  // ฟังก์ชันโหลดข้อมูลที่ปลอดภัย (Robust Fetching)
+  const fetchData = useCallback(async () => {
     try {
       const response = await fetch("/api/realtime/data")
+      
+      if (!response.ok) {
+        throw new Error("Network response was not ok")
+      }
+
       const data = await response.json()
       
-      // ✅ ใช้ processData ก่อน set
-      setSensors(processData(data))
+      // ⚠️ จุดสำคัญ: แปลง String Date กลับเป็น Object Date ทันที
+      const safeSensors = (data.sensors || []).map((s: any) => ({
+        ...s,
+        lastUpdated: s.lastUpdated ? new Date(s.lastUpdated) : new Date(),
+      }))
 
+      setSensors(safeSensors)
     } catch (error) {
-      console.error("[v0] Failed to refresh sensor data:", error)
+      console.error("[Environment] Fetch failed, using mock data:", error)
+      setSensors(generateSensorData()) // Fallback ไปใช้ Mock Data ถ้า API พัง
     } finally {
-      setIsRefreshing(false)
+      setIsLoading(false)
     }
+  }, [])
+
+  // Auto-refresh logic
+  useEffect(() => {
+    fetchData()
+    const interval = setInterval(fetchData, 3000)
+    return () => clearInterval(interval)
+  }, [fetchData])
+
+  // Handle Manual Refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await fetchData()
+    // หน่วงเวลานิดนึงให้ user รู้สึกว่าโหลดเสร็จแล้ว
+    setTimeout(() => setIsRefreshing(false), 500)
   }
 
-  // ✅ ป้องกันการ filter บนตัวแปรที่เป็น undefined โดยการเติม || []
-  const safeSensors = sensors || [] 
-  const filteredSensors = selectedType === "all" ? safeSensors : safeSensors.filter((s) => s.type === selectedType)
+  // คำนวณ Stats ด้วย useMemo (ไม่คำนวณซ้ำถ้ารายการ sensors ไม่เปลี่ยน)
+  const stats = useMemo(() => {
+    const getAvg = (type: string) => {
+      const list = sensors.filter((s) => s.type === type)
+      if (!list.length) return 0
+      return list.reduce((acc, curr) => acc + curr.value, 0) / list.length
+    }
 
-  const criticalCount = safeSensors.filter((s) => s.status === "critical").length
-  const warningCount = safeSensors.filter((s) => s.status === "warning").length
+    const getTotal = (type: string) => {
+      return sensors.filter((s) => s.type === type).reduce((acc, curr) => acc + curr.value, 0)
+    }
+
+    return {
+      avgTemp: getAvg("temperature"),
+      avgHumidity: getAvg("humidity"),
+      totalPower: getTotal("power"),
+      avgVibration: getAvg("vibration"),
+      critical: sensors.filter((s) => s.status === "critical").length,
+      warning: sensors.filter((s) => s.status === "warning").length,
+    }
+  }, [sensors])
+
+  const filteredSensors = selectedType === "all" 
+    ? sensors 
+    : sensors.filter((s) => s.type === selectedType)
+
+  // Loading State
+  if (isLoading && sensors.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[50vh]">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading environment data...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -117,17 +157,19 @@ export function EnvironmentPage() {
           <p className="text-muted-foreground">Real-time sensor data from all zones</p>
         </div>
         <div className="flex items-center gap-3">
-          {criticalCount > 0 && (
-            <Badge variant="destructive" className="gap-1">
+          {stats.critical > 0 && (
+            <Badge variant="destructive" className="gap-1 animate-pulse">
               <AlertTriangle className="h-3 w-3" />
-              {criticalCount} Critical
+              {stats.critical} Critical
             </Badge>
           )}
-          {warningCount > 0 && (
-            <Badge className="gap-1 bg-warning text-warning-foreground">{warningCount} Warning</Badge>
+          {stats.warning > 0 && (
+            <Badge className="gap-1 bg-warning text-warning-foreground">
+              {stats.warning} Warning
+            </Badge>
           )}
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+            <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
             Refresh
           </Button>
         </div>
@@ -135,9 +177,6 @@ export function EnvironmentPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* ... (Cards อื่นๆ แก้ไข safeSensors แทน sensors) ... */}
-        
-        {/* ตัวอย่างแก้ Card Temperature (ทำแบบนี้กับ Card อื่นด้วย) */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -146,13 +185,7 @@ export function EnvironmentPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {(
-                safeSensors.filter((s) => s.type === "temperature").reduce((a, b) => a + b.value, 0) /
-                Math.max(safeSensors.filter((s) => s.type === "temperature").length, 1)
-              ).toFixed(1)}
-              °C
-            </div>
+            <div className="text-2xl font-bold">{stats.avgTemp.toFixed(1)} °C</div>
             <p className="text-xs text-muted-foreground">Average across all sensors</p>
           </CardContent>
         </Card>
@@ -165,13 +198,7 @@ export function EnvironmentPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {(
-                safeSensors.filter((s) => s.type === "humidity").reduce((a, b) => a + b.value, 0) /
-                Math.max(safeSensors.filter((s) => s.type === "humidity").length, 1)
-              ).toFixed(0)}
-              %
-            </div>
+            <div className="text-2xl font-bold">{stats.avgHumidity.toFixed(0)} %</div>
             <p className="text-xs text-muted-foreground">Optimal: 40-60%</p>
           </CardContent>
         </Card>
@@ -184,13 +211,7 @@ export function EnvironmentPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {safeSensors // ✅ เปลี่ยน sensors เป็น safeSensors
-                .filter((s) => s.type === "power")
-                .reduce((a, b) => a + b.value, 0)
-                .toFixed(1)}{" "}
-              kW
-            </div>
+            <div className="text-2xl font-bold">{stats.totalPower.toFixed(1)} kW</div>
             <p className="text-xs text-muted-foreground">Total consumption</p>
           </CardContent>
         </Card>
@@ -203,19 +224,13 @@ export function EnvironmentPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {(
-                safeSensors.filter((s) => s.type === "vibration").reduce((a, b) => a + b.value, 0) /
-                Math.max(safeSensors.filter((s) => s.type === "vibration").length, 1)
-              ).toFixed(1)}{" "}
-              mm/s
-            </div>
+            <div className="text-2xl font-bold">{stats.avgVibration.toFixed(1)} mm/s</div>
             <p className="text-xs text-muted-foreground">Average vibration level</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Sensor Grid */}
+      {/* Sensor Grid with Tabs */}
       <Card>
         <CardHeader>
           <CardTitle>All Sensors</CardTitle>
@@ -233,36 +248,43 @@ export function EnvironmentPage() {
 
             <TabsContent value={selectedType} className="mt-0">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filteredSensors.map((sensor) => (
-                  <div
-                    key={sensor.id}
-                    className={cn(
-                      "rounded-lg border p-4 transition-all hover:scale-102 cursor-pointer",
-                      getStatusBg(sensor.status),
-                    )}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className={cn("p-2 rounded-lg bg-background", getStatusColor(sensor.status))}>
-                        {getSensorIcon(sensor.type)}
+                {filteredSensors.length > 0 ? (
+                  filteredSensors.map((sensor) => (
+                    <div
+                      key={sensor.id}
+                      className={cn(
+                        "rounded-lg border p-4 transition-all hover:scale-102 cursor-pointer",
+                        getStatusBg(sensor.status)
+                      )}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className={cn("p-2 rounded-lg bg-background", getStatusColor(sensor.status))}>
+                          {getSensorIcon(sensor.type)}
+                        </div>
+                        <Badge variant="outline" className={cn("capitalize", getStatusColor(sensor.status))}>
+                          {sensor.status}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className={cn("capitalize", getStatusColor(sensor.status))}>
-                        {sensor.status}
-                      </Badge>
+                      <div className="mt-3">
+                        <h4 className="font-medium text-foreground">{sensor.name}</h4>
+                        <p className="text-xs text-muted-foreground">{sensor.location}</p>
+                      </div>
+                      <div className="mt-2">
+                        <span className={cn("text-2xl font-bold", getStatusColor(sensor.status))}>
+                          {sensor.value}
+                        </span>
+                        <span className="text-sm text-muted-foreground ml-1">{sensor.unit}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Updated: {sensor.lastUpdated.toLocaleTimeString()}
+                      </p>
                     </div>
-                    <div className="mt-3">
-                      <h4 className="font-medium text-foreground">{sensor.name}</h4>
-                      <p className="text-xs text-muted-foreground">{sensor.location}</p>
-                    </div>
-                    <div className="mt-2">
-                      <span className={cn("text-2xl font-bold", getStatusColor(sensor.status))}>{sensor.value}</span>
-                      <span className="text-sm text-muted-foreground ml-1">{sensor.unit}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                       {/* ✅ ใช้ ? เพื่อป้องกันกรณี lastUpdated ไม่มีค่า หรือไม่ใช่ Date */}
-                      Updated: {sensor.lastUpdated instanceof Date && !isNaN(sensor.lastUpdated.getTime()) ? sensor.lastUpdated.toLocaleTimeString() : 'N/A'}
-                    </p>
+                  ))
+                ) : (
+                  <div className="col-span-full flex flex-col items-center justify-center py-8 text-muted-foreground">
+                    <p>No sensors found in this category.</p>
                   </div>
-                ))}
+                )}
               </div>
             </TabsContent>
           </Tabs>
