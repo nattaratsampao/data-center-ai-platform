@@ -136,18 +136,30 @@ ${warningServers.map((s: Server) => `• ${s.name}: CPU ${s.cpu}%`).join("\n")}
 
 พิมพ์ "ช่วยเหลือ" เพื่อดูคำสั่งเพิ่มเติม`
   } else if (userMessage.includes("temperature") || userMessage.includes("อุณหภูมิ")) {
-    const temps = realtimeData.sensors.temperature
-    const avgTemp = (temps.reduce((sum: number, t: TemperatureSensor) => sum + t.value, 0) / temps.length).toFixed(1)
-    const maxTemp = Math.max(...temps.map((t: TemperatureSensor) => t.value)).toFixed(1)
-    const minTemp = Math.min(...temps.map((t: TemperatureSensor) => t.value)).toFixed(1)
+    // --- แก้ไขจุดที่ 1: ตรวจสอบ Array ว่างก่อนคำนวณ ---
+    const temps = realtimeData.sensors.temperature || []
 
-    replyMessage = `🌡️ สถานะอุณหภูมิ
+    if (temps.length === 0) {
+      replyMessage = `🌡️ สถานะอุณหภูมิ
+
+⚠️ ไม่พบข้อมูลจากเซนเซอร์ในขณะนี้
+กรุณาตรวจสอบการเชื่อมต่ออุปกรณ์หรือลองใหม่ภายหลัง`
+    } else {
+      const avgTemp = (temps.reduce((sum: number, t: TemperatureSensor) => sum + t.value, 0) / temps.length).toFixed(1)
+      const maxTemp = Math.max(...temps.map((t: TemperatureSensor) => t.value)).toFixed(1)
+      const minTemp = Math.min(...temps.map((t: TemperatureSensor) => t.value)).toFixed(1)
+
+      const hasWarning = temps.some((t: TemperatureSensor) => t.status === "warning")
+
+      replyMessage = `🌡️ สถานะอุณหภูมิ
 
 อุณหภูมิเฉลี่ย: ${avgTemp}°C
 อุณหภูมิสูงสุด: ${maxTemp}°C
 อุณหภูมิต่ำสุด: ${minTemp}°C
 
-${temps.filter((t: TemperatureSensor) => t.status === "warning").length > 0 ? "⚠️ มี Sensor บางตัวแสดงค่าสูง" : "✅ ระบบทำความเย็นทำงานปกติ"}`
+${hasWarning ? "⚠️ มี Sensor บางตัวแสดงค่าสูง" : "✅ ระบบทำความเย็นทำงานปกติ"}`
+    }
+    // ------------------------------------------------
   } else if (userMessage.includes("help") || userMessage.includes("ช่วยเหลือ")) {
     replyMessage = `🤖 ผู้ช่วย Data Center AI
 
@@ -307,7 +319,11 @@ async function fetchRealtimeData(): Promise<RealtimeData> {
       },
       servers: [],
       sensors: {
-        temperature: [],
+        // --- แก้ไขจุดที่ 2: ใส่ข้อมูลจำลองเพื่อป้องกัน Array ว่างในกรณี Error ---
+        temperature: [
+          { id: "mock-t1", value: 24.5, status: "ok" },
+          { id: "mock-t2", value: 25.0, status: "ok" }
+        ],
         humidity: [],
         power: { total: 30, servers: 20, cooling: 8 },
       },
