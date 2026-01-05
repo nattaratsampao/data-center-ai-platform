@@ -1,5 +1,5 @@
+// lib/event-simulator.ts
 // Event Simulation Engine for Data Center AI Platform
-// สร้างเหตุการณ์ต่างๆ แบบ random และสมจริง
 
 export type EventType =
   | "cpu_spike"
@@ -14,7 +14,7 @@ export type EventType =
   | "maintenance_required"
   | "workload_surge"
   | "ai_optimization"
-  | "anomaly" // <--- เพิ่มบรรทัดนี้ครับ
+  | "anomaly" // ✅ มี Anomaly ตามที่คุณต้องการ
 
 export interface SimulationEvent {
   id: string
@@ -31,6 +31,8 @@ export interface SimulationEvent {
     memory?: number
     temperature?: number
     healthScore?: number
+    disk?: number
+    network?: number
   }
   aiResponse?: string
   resolved: boolean
@@ -49,40 +51,103 @@ export interface ServerState {
   activeEvents: SimulationEvent[]
 }
 
-// Global state
+// ✅ เพิ่ม Interface สำหรับ Sensor State
+export interface SensorState {
+  id: string
+  type: "temperature" | "humidity" | "power" | "vibration"
+  name: string
+  value: number
+  unit: string
+  status: "normal" | "warning" | "critical"
+  location: string
+}
+
+// --- Global state ---
 const serverStates: Map<string, ServerState> = new Map()
+const sensors: SensorState[] = [] // ✅ ตัวแปรเก็บค่า Sensors ให้คงที่
 let activeEvents: SimulationEvent[] = []
 const eventHistory: SimulationEvent[] = []
 let eventCounter = 0
 
-// Initialize server states
+// Initialize server & sensor states
 export function initializeServers() {
-  const servers = [
-    "Server-001",
-    "Server-002",
-    "Server-003",
-    "Server-004",
-    "Server-005",
-    "Server-006",
-    "Server-007",
-    "Server-008",
-  ]
+  // 1. Init Servers
+  if (serverStates.size === 0) {
+    const serverNames = [
+      "Server-001",
+      "Server-002",
+      "Server-003",
+      "Server-004",
+      "Server-005",
+      "Server-006",
+      "Server-007",
+      "Server-008",
+    ]
 
-  servers.forEach((name, index) => {
-    const id = `srv${index + 1}`
-    serverStates.set(id, {
-      id,
-      name,
-      cpu: 30 + Math.random() * 30,
-      memory: 40 + Math.random() * 30,
-      temperature: 22 + Math.random() * 4,
-      disk: 20 + Math.random() * 40,
-      network: 50 + Math.random() * 100,
-      healthScore: 85 + Math.random() * 10,
-      status: "online",
-      activeEvents: [],
+    serverNames.forEach((name, index) => {
+      const id = `srv${index + 1}`
+      serverStates.set(id, {
+        id,
+        name,
+        cpu: 30 + Math.random() * 30,
+        memory: 40 + Math.random() * 30,
+        temperature: 22 + Math.random() * 4,
+        disk: 20 + Math.random() * 40,
+        network: 50 + Math.random() * 100,
+        healthScore: 85 + Math.random() * 10,
+        status: "online",
+        activeEvents: [],
+      })
     })
-  })
+  }
+
+  // 2. Init Sensors (สร้างครั้งเดียว)
+  if (sensors.length === 0) {
+    // Temperature Sensors
+    for (let i = 1; i <= 8; i++) {
+      sensors.push({
+        id: `temp-${i}`,
+        type: "temperature",
+        name: `Temp Sensor ${i}`,
+        value: 23 + Math.random() * 2,
+        unit: "°C",
+        status: "normal",
+        location: i <= 4 ? "Rack A" : "Rack B",
+      })
+    }
+    // Humidity Sensors
+    for (let i = 1; i <= 4; i++) {
+      sensors.push({
+        id: `hum-${i}`,
+        type: "humidity",
+        name: `Hum Sensor ${i}`,
+        value: 45 + Math.random() * 5,
+        unit: "%",
+        status: "normal",
+        location: i <= 2 ? "Rack A" : "Rack B",
+      })
+    }
+    // Power Sensor
+    sensors.push({
+      id: "pwr-main",
+      type: "power",
+      name: "Main Power",
+      value: 28.5,
+      unit: "kW",
+      status: "normal",
+      location: "Main Dist",
+    })
+    // Vibration Sensor
+    sensors.push({
+      id: "vib-1",
+      type: "vibration",
+      name: "Cooling Vib",
+      value: 0.5,
+      unit: "mm/s",
+      status: "normal",
+      location: "Cooling Zone",
+    })
+  }
 }
 
 // Event templates with Thai descriptions
@@ -95,9 +160,7 @@ const eventTemplates: Record<
     impact: (severity: string) => SimulationEvent["impact"]
     aiResponse: (severity: string) => string
     duration: () => number
-
   }
-  
 > = {
   cpu_spike: {
     severityRange: ["medium", "high", "critical"],
@@ -136,7 +199,9 @@ const eventTemplates: Record<
       healthScore: sev === "critical" ? -25 : -15,
     }),
     aiResponse: (sev) =>
-      sev === "critical" ? "AI กำลัง shutdown workload และส่งแจ้งเตือนให้ทีมซ่อมบำรุง" : "AI กำลังเพิ่มกำลังระบบทำความเย็นสำรอง",
+      sev === "critical"
+        ? "AI กำลัง shutdown workload และส่งแจ้งเตือนให้ทีมซ่อมบำรุง"
+        : "AI กำลังเพิ่มกำลังระบบทำความเย็นสำรอง",
     duration: () => 120000 + Math.random() * 180000,
   },
   power_surge: {
@@ -157,7 +222,8 @@ const eventTemplates: Record<
       network: sev === "high" ? 200 : sev === "medium" ? 150 : 100,
       cpu: sev === "high" ? 15 : sev === "medium" ? 10 : 5,
     }),
-    aiResponse: (sev) => (sev === "high" ? "AI กำลังปรับ routing และจำกัด bandwidth" : "AI กำลังตรวจสอบ traffic patterns"),
+    aiResponse: (sev) =>
+      sev === "high" ? "AI กำลังปรับ routing และจำกัด bandwidth" : "AI กำลังตรวจสอบ traffic patterns",
     duration: () => 40000 + Math.random() * 80000,
   },
   hardware_failure: {
@@ -182,7 +248,9 @@ const eventTemplates: Record<
       healthScore: sev === "critical" ? -20 : sev === "high" ? -12 : -8,
     }),
     aiResponse: (sev) =>
-      sev === "critical" ? "AI กำลังลด workload และเพิ่มระบบทำความเย็นสูงสุด" : "AI กำลังเพิ่มประสิทธิภาพ cooling",
+      sev === "critical"
+        ? "AI กำลังลด workload และเพิ่มระบบทำความเย็นสูงสุด"
+        : "AI กำลังเพิ่มประสิทธิภาพ cooling",
     duration: () => 45000 + Math.random() * 90000,
   },
   vibration_alert: {
@@ -193,7 +261,9 @@ const eventTemplates: Record<
       healthScore: sev === "high" ? -15 : sev === "medium" ? -8 : -5,
     }),
     aiResponse: (sev) =>
-      sev === "high" ? "AI แนะนำให้ตรวจสอบพัดลมและ hard disk ทันที" : "AI กำลังติดตามและบันทึก vibration patterns",
+      sev === "high"
+        ? "AI แนะนำให้ตรวจสอบพัดลมและ hard disk ทันที"
+        : "AI กำลังติดตามและบันทึก vibration patterns",
     duration: () => 60000 + Math.random() * 120000,
   },
   maintenance_required: {
@@ -216,7 +286,9 @@ const eventTemplates: Record<
       temperature: sev === "high" ? 6 : 4,
     }),
     aiResponse: (sev) =>
-      sev === "high" ? "AI กำลัง scale up resources และปรับสมดุล workload" : "AI กำลังตรวจสอบ workload patterns",
+      sev === "high"
+        ? "AI กำลัง scale up resources และปรับสมดุล workload"
+        : "AI กำลังตรวจสอบ workload patterns",
     duration: () => 90000 + Math.random() * 120000,
   },
   disk_full: {
@@ -228,7 +300,9 @@ const eventTemplates: Record<
       healthScore: sev === "critical" ? -25 : sev === "high" ? -15 : -8,
     }),
     aiResponse: (sev) =>
-      sev === "critical" ? "AI กำลังลบ temporary files และย้ายข้อมูล" : "AI กำลังวิเคราะห์การใช้ disk space",
+      sev === "critical"
+        ? "AI กำลังลบ temporary files และย้ายข้อมูล"
+        : "AI กำลังวิเคราะห์การใช้ disk space",
     duration: () => 120000 + Math.random() * 180000,
   },
   ai_optimization: {
@@ -243,7 +317,6 @@ const eventTemplates: Record<
     aiResponse: () => "AI ปรับแต่ง configuration เพื่อประสิทธิภาพที่ดีขึ้น",
     duration: () => 30000 + Math.random() * 60000,
   },
-
   anomaly: {
     severityRange: ["medium", "high"],
     titleTH: "⚠️ ตรวจพบความผิดปกติ (Anomaly)",
@@ -384,6 +457,12 @@ export function getServerStates(): ServerState[] {
   return Array.from(serverStates.values())
 }
 
+// ✅ Export function นี้เพื่อให้ API Route เรียกใช้ได้
+export function getSensorStates(): SensorState[] {
+  if (sensors.length === 0 && serverStates.size === 0) initializeServers()
+  return sensors
+}
+
 // Get active events
 export function getActiveEvents(): SimulationEvent[] {
   return activeEvents
@@ -398,29 +477,43 @@ export function getEventHistory(limit = 50): SimulationEvent[] {
 export function updateSimulation() {
   if (serverStates.size === 0) initializeServers()
 
-  // Natural drift of values
+  // 1. Natural drift of Server values
   serverStates.forEach((server) => {
     if (server.status !== "offline") {
-      // CPU naturally fluctuates
       server.cpu += (Math.random() - 0.5) * 5
       server.cpu = Math.max(15, Math.min(85, server.cpu))
 
-      // Memory slowly increases/decreases
       server.memory += (Math.random() - 0.5) * 2
       server.memory = Math.max(30, Math.min(90, server.memory))
 
-      // Temperature follows CPU
       const targetTemp = 20 + (server.cpu / 100) * 12
       server.temperature += (targetTemp - server.temperature) * 0.1
       server.temperature = Math.max(18, Math.min(35, server.temperature))
 
-      // Health slowly recovers if no active events
       if (server.activeEvents.length === 0 && server.healthScore < 95) {
         server.healthScore += 0.5
       }
     }
   })
 
+  // 2. ✅ Natural drift of Sensor values (เพื่อให้กราฟสวยและต่อเนื่อง)
+  sensors.forEach((sensor) => {
+    if (sensor.type === "temperature") {
+      sensor.value += (Math.random() - 0.5) * 0.5
+      sensor.value = Math.max(18, Math.min(35, sensor.value))
+    } else if (sensor.type === "humidity") {
+      sensor.value += (Math.random() - 0.5) * 1
+      sensor.value = Math.max(30, Math.min(70, sensor.value))
+    } else if (sensor.type === "power") {
+      // Power แปรผันตาม Load ของ Server รวม
+      const totalCpu = Array.from(serverStates.values()).reduce((sum, s) => sum + s.cpu, 0)
+      const targetPower = 20 + (totalCpu / 600) * 15
+      sensor.value += (targetPower - sensor.value) * 0.1
+    } else if (sensor.type === "vibration") {
+      sensor.value = Math.max(0, sensor.value + (Math.random() - 0.5) * 0.1)
+    }
+  })
+
   // Possibly generate new event
   return generateRandomEvent()
-}
+}   
