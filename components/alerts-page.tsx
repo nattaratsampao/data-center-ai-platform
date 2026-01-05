@@ -53,8 +53,16 @@ function getSeverityStyles(severity: AlertData["severity"]) {
   }
 }
 
-function formatTime(date: Date): string {
-  return date.toLocaleString("th-TH", {
+function formatTime(date: Date | string): string {
+  // ✅ แก้ไข: รองรับทั้ง Date object และ String เพื่อความปลอดภัย
+  const d = typeof date === 'string' ? new Date(date) : date;
+  
+  // เช็คว่าเป็นวันที่ที่ถูกต้องหรือไม่
+  if (!(d instanceof Date) || isNaN(d.getTime())) {
+    return "N/A"; 
+  }
+
+  return d.toLocaleString("th-TH", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -63,15 +71,31 @@ function formatTime(date: Date): string {
 }
 
 export function AlertsPage() {
+  // ✅ เริ่มต้นด้วย Array ว่างเสมอ
   const [alerts, setAlerts] = useState<AlertData[]>([])
   const [selectedType, setSelectedType] = useState<string>("all")
+
+  // ✅ ฟังก์ชันแปลงข้อมูลให้ปลอดภัย (Safe Parsing)
+  const processData = (rawData: any) => {
+    // 1. เช็คว่าเป็น Array ไหม ถ้าไม่ให้คืนค่า Array ว่าง
+    const list = Array.isArray(rawData?.alerts) ? rawData.alerts : []
+
+    // 2. แปลง timestamp string เป็น Date object
+    return list.map((item: any) => ({
+      ...item,
+      timestamp: new Date(item.timestamp)
+    }))
+  }
 
   useEffect(() => {
     const fetchRealtimeData = async () => {
       try {
         const response = await fetch("/api/realtime/data")
         const data = await response.json()
-        setAlerts(data.alerts)
+        
+        // ✅ ใช้ processData ตรวจสอบและแปลงข้อมูลก่อน set state
+        setAlerts(processData(data))
+        
       } catch (error) {
         console.error("[v0] Failed to fetch realtime alerts:", error)
         setAlerts(generateAlerts())
@@ -83,16 +107,18 @@ export function AlertsPage() {
     return () => clearInterval(interval)
   }, [])
 
-  const filteredAlerts = selectedType === "all" ? alerts : alerts.filter((a) => a.type === selectedType)
+  // ✅ เพิ่ม || [] เพื่อป้องกันกรณี alerts หลุดเป็น undefined
+  const safeAlerts = alerts || []
+  const filteredAlerts = selectedType === "all" ? safeAlerts : safeAlerts.filter((a) => a.type === selectedType)
 
-  const criticalCount = alerts.filter((a) => a.severity === "critical").length
-  const highCount = alerts.filter((a) => a.severity === "high").length
-  const anomalyCount = alerts.filter((a) => a.type === "anomaly").length
-  const predictionCount = alerts.filter((a) => a.type === "prediction").length
-  const optimizationCount = alerts.filter((a) => a.type === "optimization").length
+  const criticalCount = safeAlerts.filter((a) => a.severity === "critical").length
+  const highCount = safeAlerts.filter((a) => a.severity === "high").length
+  const anomalyCount = safeAlerts.filter((a) => a.type === "anomaly").length
+  const predictionCount = safeAlerts.filter((a) => a.type === "prediction").length
+  const optimizationCount = safeAlerts.filter((a) => a.type === "optimization").length
 
   const handleDismiss = (id: string) => {
-    setAlerts(alerts.filter((a) => a.id !== id))
+    setAlerts(safeAlerts.filter((a) => a.id !== id))
   }
 
   const handleAcknowledge = (id: string) => {
@@ -111,7 +137,7 @@ export function AlertsPage() {
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="gap-1">
             <Bell className="h-3 w-3" />
-            {alerts.length} Active
+            {safeAlerts.length} Active
           </Badge>
         </div>
       </div>
@@ -159,7 +185,7 @@ export function AlertsPage() {
         <CardContent>
           <Tabs defaultValue="all" className="w-full" onValueChange={setSelectedType}>
             <TabsList className="mb-4">
-              <TabsTrigger value="all">All ({alerts.length})</TabsTrigger>
+              <TabsTrigger value="all">All ({safeAlerts.length})</TabsTrigger>
               <TabsTrigger value="anomaly">Anomaly ({anomalyCount})</TabsTrigger>
               <TabsTrigger value="prediction">Prediction ({predictionCount})</TabsTrigger>
               <TabsTrigger value="optimization">Optimization ({optimizationCount})</TabsTrigger>

@@ -9,6 +9,7 @@ import { Thermometer, Droplets, Zap, Vibrate, RefreshCw, AlertTriangle } from "l
 import { generateSensorData, type SensorData } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 
+// ... (function getStatusColor, getStatusBg, getSensorIcon เหมือนเดิม ไม่ต้องแก้) ...
 function getStatusColor(status: SensorData["status"]) {
   switch (status) {
     case "normal":
@@ -43,20 +44,38 @@ function getSensorIcon(type: SensorData["type"]) {
       return <Vibrate className="h-5 w-5" />
   }
 }
+// ... จบส่วน function ช่วยเหลือ ...
 
 export function EnvironmentPage() {
-  const [sensors, setSensors] = useState<SensorData[]>([])
+  // ✅ แก้ไข: กำหนดค่าเริ่มต้นเป็น Array ว่างเสมอ
+  const [sensors, setSensors] = useState<SensorData[]>([]) 
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedType, setSelectedType] = useState<string>("all")
+
+  // ✅ ฟังก์ชันช่วยแปลงข้อมูล (ป้องกัน Error เรื่อง Date และ Array)
+  const processData = (rawData: any) => {
+    // เช็คว่า rawData.sensors มีจริงไหม และเป็น Array ไหม
+    const list = Array.isArray(rawData?.sensors) ? rawData.sensors : []
+    
+    // แปลงวันที่ string เป็น Date Object เพื่อให้ .toLocaleTimeString() ทำงานได้
+    return list.map((item: any) => ({
+      ...item,
+      lastUpdated: new Date(item.lastUpdated)
+    }))
+  }
 
   useEffect(() => {
     const fetchRealtimeData = async () => {
       try {
         const response = await fetch("/api/realtime/data")
         const data = await response.json()
-        setSensors(data.sensors)
+        
+        // ✅ ใช้ processData ก่อน set
+        setSensors(processData(data)) 
+
       } catch (error) {
         console.error("[v0] Failed to fetch realtime sensor data:", error)
+        // กรณี Error ให้ใช้ Mock Data
         setSensors(generateSensorData())
       }
     }
@@ -71,7 +90,10 @@ export function EnvironmentPage() {
     try {
       const response = await fetch("/api/realtime/data")
       const data = await response.json()
-      setSensors(data.sensors)
+      
+      // ✅ ใช้ processData ก่อน set
+      setSensors(processData(data))
+
     } catch (error) {
       console.error("[v0] Failed to refresh sensor data:", error)
     } finally {
@@ -79,10 +101,12 @@ export function EnvironmentPage() {
     }
   }
 
-  const filteredSensors = selectedType === "all" ? sensors : sensors.filter((s) => s.type === selectedType)
+  // ✅ ป้องกันการ filter บนตัวแปรที่เป็น undefined โดยการเติม || []
+  const safeSensors = sensors || [] 
+  const filteredSensors = selectedType === "all" ? safeSensors : safeSensors.filter((s) => s.type === selectedType)
 
-  const criticalCount = sensors.filter((s) => s.status === "critical").length
-  const warningCount = sensors.filter((s) => s.status === "warning").length
+  const criticalCount = safeSensors.filter((s) => s.status === "critical").length
+  const warningCount = safeSensors.filter((s) => s.status === "warning").length
 
   return (
     <div className="p-6 space-y-6">
@@ -111,6 +135,9 @@ export function EnvironmentPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* ... (Cards อื่นๆ แก้ไข safeSensors แทน sensors) ... */}
+        
+        {/* ตัวอย่างแก้ Card Temperature (ทำแบบนี้กับ Card อื่นด้วย) */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -121,8 +148,8 @@ export function EnvironmentPage() {
           <CardContent>
             <div className="text-2xl font-bold">
               {(
-                sensors.filter((s) => s.type === "temperature").reduce((a, b) => a + b.value, 0) /
-                Math.max(sensors.filter((s) => s.type === "temperature").length, 1)
+                safeSensors.filter((s) => s.type === "temperature").reduce((a, b) => a + b.value, 0) /
+                Math.max(safeSensors.filter((s) => s.type === "temperature").length, 1)
               ).toFixed(1)}
               °C
             </div>
@@ -140,8 +167,8 @@ export function EnvironmentPage() {
           <CardContent>
             <div className="text-2xl font-bold">
               {(
-                sensors.filter((s) => s.type === "humidity").reduce((a, b) => a + b.value, 0) /
-                Math.max(sensors.filter((s) => s.type === "humidity").length, 1)
+                safeSensors.filter((s) => s.type === "humidity").reduce((a, b) => a + b.value, 0) /
+                Math.max(safeSensors.filter((s) => s.type === "humidity").length, 1)
               ).toFixed(0)}
               %
             </div>
@@ -158,7 +185,7 @@ export function EnvironmentPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {sensors
+              {safeSensors // ✅ เปลี่ยน sensors เป็น safeSensors
                 .filter((s) => s.type === "power")
                 .reduce((a, b) => a + b.value, 0)
                 .toFixed(1)}{" "}
@@ -178,8 +205,8 @@ export function EnvironmentPage() {
           <CardContent>
             <div className="text-2xl font-bold">
               {(
-                sensors.filter((s) => s.type === "vibration").reduce((a, b) => a + b.value, 0) /
-                Math.max(sensors.filter((s) => s.type === "vibration").length, 1)
+                safeSensors.filter((s) => s.type === "vibration").reduce((a, b) => a + b.value, 0) /
+                Math.max(safeSensors.filter((s) => s.type === "vibration").length, 1)
               ).toFixed(1)}{" "}
               mm/s
             </div>
@@ -231,7 +258,8 @@ export function EnvironmentPage() {
                       <span className="text-sm text-muted-foreground ml-1">{sensor.unit}</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Updated: {sensor.lastUpdated.toLocaleTimeString()}
+                       {/* ✅ ใช้ ? เพื่อป้องกันกรณี lastUpdated ไม่มีค่า หรือไม่ใช่ Date */}
+                      Updated: {sensor.lastUpdated instanceof Date && !isNaN(sensor.lastUpdated.getTime()) ? sensor.lastUpdated.toLocaleTimeString() : 'N/A'}
                     </p>
                   </div>
                 ))}
