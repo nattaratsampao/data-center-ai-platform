@@ -18,13 +18,11 @@ export function OverviewPage() {
   const [alerts, setAlerts] = useState(generateAlerts())
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [newEventsCount, setNewEventsCount] = useState(0)
 
   useEffect(() => {
-    // Initial load
     loadRealtimeData()
-
-    // Auto-refresh every 3 seconds
     const interval = setInterval(() => {
       loadRealtimeData()
     }, 3000)
@@ -40,19 +38,13 @@ export function OverviewPage() {
         const newEvents = data.activeEvents.length - realtimeData.activeEvents.length
         if (newEvents > 0) {
           setNewEventsCount((prev) => prev + newEvents)
-          const criticalEvents = data.activeEvents.filter(
-            (e: any) => e.severity === "critical" && !realtimeData.activeEvents.find((old: any) => old.id === e.id),
-          )
-          if (criticalEvents.length > 0) {
-            console.log(`[v0] 🚨 Critical event: ${criticalEvents[0].title}`)
-          }
         }
       }
 
       setRealtimeData(data)
       setLastUpdate(new Date())
     } catch (error) {
-      console.error("[v0] Failed to load realtime data:", error)
+      console.error("[Overview] Failed to load realtime data:", error)
     }
   }
 
@@ -75,9 +67,16 @@ export function OverviewPage() {
   }
 
   const { servers, stats, aiInsights, activeEvents } = realtimeData
-  const criticalAlerts = alerts.filter((a) => a.severity === "critical").length
-  const warningServers = servers.filter((s: any) => s.status === "warning").length
+  
+  // ⚠️ จุดที่แก้: ดึงค่า Power จาก Array sensors (หาตัวที่มี type = 'power')
+  const powerSensor = Array.isArray(realtimeData.sensors) 
+    ? realtimeData.sensors.find((s: any) => s.type === 'power') 
+    : { value: 0 };
+    
+  const totalPower = powerSensor ? powerSensor.value : 0;
+
   const criticalEvents = activeEvents?.filter((e: any) => e.severity === "critical").length || 0
+  const warningServers = servers.filter((s: any) => s.status === "warning").length
 
   return (
     <div className="p-6 space-y-6">
@@ -120,7 +119,7 @@ export function OverviewPage() {
         </Card>
       )}
 
-      {/* Stats Grid - แสดงค่าที่เปลี่ยนแปลง */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -154,7 +153,8 @@ export function OverviewPage() {
             <Zap className="h-4 w-4 text-chart-3" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{realtimeData.sensors.power.total} kW</div>
+            {/* ⚠️ จุดที่แก้: ใช้ตัวแปร totalPower ที่เราดึงมาข้างบน แทนการเรียก object ซ้อนๆ */}
+            <div className="text-2xl font-bold">{totalPower} kW</div>
             <div className="flex items-center text-xs text-success">
               <TrendingUp className="h-3 w-3 mr-1" />
               PUE: {stats.pue}
@@ -232,7 +232,7 @@ export function OverviewPage() {
         </Card>
       </div>
 
-      {/* AI Optimization Status - แสดงสถานะ real-time */}
+      {/* AI Stats ... (ส่วนล่างเหมือนเดิมครับ ไม่มีการเปลี่ยนแปลงโครงสร้างข้อมูล) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
