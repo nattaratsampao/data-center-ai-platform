@@ -86,11 +86,18 @@ function generateRealtimeData() {
       powerUsage: Math.round(totalPower * 1.5),
       pue: 1.45,
     },
+
     aiInsights: {
-      anomalyDetected: activeEvents.some((e: any) => e.severity === "critical"),
-      predictiveAlerts: activeEvents.filter((e: any) => e.type?.includes("prediction")).length,
-      optimizationsSuggested: 3,
-      confidenceScore: 92.5,
-    },
+          anomalyDetected: activeEvents.some((e: any) => e.severity === "critical"),
+          predictiveAlerts: activeEvents.filter((e: any) => e.type?.includes("prediction")).length,
+          
+          // ✅ แก้ตรงนี้: ให้สุ่มค่าทีละนิด เพื่อให้กราฟขยับ (Simulation)
+          optimizationsSuggested: Math.floor(Math.random() * 5) + 1, 
+          confidenceScore: Math.round((85 + Math.random() * 14) * 10) / 10, // สุ่มระหว่าง 85% - 99%
+          
+          // ✅ เพิ่มค่าใหม่สำหรับกราฟอีก 2 แท่ง
+          maintenanceScore: Math.round((75 + Math.random() * 20) * 10) / 10,
+          loadBalancingScore: Math.round((80 + Math.random() * 15) * 10) / 10,
+        },
   }
 }

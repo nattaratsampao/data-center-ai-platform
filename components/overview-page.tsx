@@ -12,18 +12,12 @@ import { PowerChart } from "./charts/power-chart"
 import { ServerHeatmap } from "./server-heatmap"
 import { AlertsList } from "./alerts-list"
 
-// ❌ ไม่ต้อง import generateAlerts แล้ว
-// import { generateAlerts } from "@/lib/mock-data"
-
 export function OverviewPage() {
   const [realtimeData, setRealtimeData] = useState<any>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [newEventsCount, setNewEventsCount] = useState(0)
-
-  // ❌ ลบ State alerts ที่เป็น Mock ทิ้งไป
-  // const [alerts, setAlerts] = useState(generateAlerts())
 
   useEffect(() => {
     loadRealtimeData()
@@ -38,7 +32,6 @@ export function OverviewPage() {
     try {
       const data = await fetchRealtimeData()
 
-      // ✅ แปลง Timestamp ของ Events ให้เป็น Date Object เพื่อให้ AlertsList ใช้งานได้
       if (data.activeEvents) {
         data.activeEvents = data.activeEvents.map((e: any) => ({
           ...e,
@@ -63,7 +56,6 @@ export function OverviewPage() {
   const handleRefresh = async () => {
     setIsRefreshing(true)
     await loadRealtimeData()
-    // ❌ ไม่ต้อง setAlerts(generateAlerts()) แล้ว
     setTimeout(() => setIsRefreshing(false), 500)
   }
 
@@ -80,7 +72,6 @@ export function OverviewPage() {
 
   const { servers, stats, aiInsights, activeEvents } = realtimeData
   
-  // ดึงค่า Power จาก Array sensors
   const powerSensor = Array.isArray(realtimeData.sensors) 
     ? realtimeData.sensors.find((s: any) => s.type === 'power') 
     : { value: 0 };
@@ -179,7 +170,6 @@ export function OverviewPage() {
             <AlertTriangle className="h-4 w-4 text-chart-4" />
           </CardHeader>
           <CardContent>
-            {/* ✅ ใช้ activeEvents.length แทน alerts.length */}
             <div className="text-2xl font-bold">{activeEvents?.length || 0}</div>
             {criticalEvents > 0 && <p className="text-xs text-destructive">{criticalEvents} วิกฤต</p>}
           </CardContent>
@@ -239,13 +229,12 @@ export function OverviewPage() {
             <CardDescription>การแจ้งเตือนและการทำนายล่าสุด</CardDescription>
           </CardHeader>
           <CardContent>
-            {/* ✅ จุดสำคัญ: ส่ง activeEvents จริงๆ เข้าไปใน AlertsList แทน mock alerts */}
             <AlertsList alerts={activeEvents ? activeEvents.slice(0, 4) : []} />
           </CardContent>
         </Card>
       </div>
 
-      {/* AI Stats (ส่วนล่างยังเหมือนเดิม) */}
+      {/* AI Stats - แก้ไขให้รับค่า Dynamic จาก API */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -261,30 +250,35 @@ export function OverviewPage() {
                 <span className="text-muted-foreground">ตรวจจับความผิดปกติ</span>
                 <span className="font-medium">{aiInsights.anomalyDetected ? "🔴 พบความผิดปกติ" : "✅ ปกติ"}</span>
               </div>
+              {/* ใช้ confidenceScore ที่เปลี่ยนไปเรื่อยๆ */}
               <Progress value={aiInsights.confidenceScore} className="h-2" />
               <p className="text-xs text-muted-foreground">{aiInsights.confidenceScore}% ความมั่นใจในการรู้จำรูปแบบ</p>
             </div>
+            
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">การบำรุงรักษาเชิงคาดการณ์</span>
                 <span className="font-medium">ทำงานอยู่</span>
               </div>
-              <Progress value={87} className="h-2" />
+              {/* ✅ ใช้ maintenanceScore จาก API (ถ้าไม่มีใช้ 85) */}
+              <Progress value={aiInsights.maintenanceScore || 85} className="h-2" />
               <p className="text-xs text-muted-foreground">{aiInsights.predictiveAlerts} การแจ้งเตือนเชิงคาดการณ์</p>
             </div>
+            
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">AI ปรับสมดุลโหลด</span>
                 <span className="font-medium">ทำงานอยู่</span>
               </div>
-              <Progress value={91} className="h-2" />
+              {/* ✅ ใช้ loadBalancingScore จาก API (ถ้าไม่มีใช้ 90) */}
+              <Progress value={aiInsights.loadBalancingScore || 90} className="h-2" />
               <p className="text-xs text-muted-foreground">{aiInsights.optimizationsSuggested} คำแนะนำในการปรับปรุง</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Active Events Section (ส่วนล่างสุด ใช้ activeEvents อยู่แล้ว จึงถูกต้อง) */}
+      {/* Active Events Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
