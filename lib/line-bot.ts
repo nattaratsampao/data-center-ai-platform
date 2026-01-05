@@ -1,120 +1,116 @@
+// lib/line-bot.ts
+import { getServerStates, getSensorStates } from "@/lib/event-simulator"
+
+// Interface สำหรับ Config
 export interface LineBotConfig {
   channelAccessToken: string
   channelSecret: string
   enabled: boolean
 }
 
+// Interface สำหรับ Alert ที่จะส่งเข้า LINE
 export interface LineBotAlert {
   type: string
   severity: string
   title: string
   description: string
-  aiConfidence: number
-  timestamp?: string
+  aiResponse?: string // เพิ่ม field นี้เพื่อให้โชว์สิ่งที่ AI ทำ
+  timestamp?: Date | string
 }
 
-// ส่งการแจ้งเตือนไปยังผู้ใช้ LINE คนใดคนหนึ่ง
+// 1. ส่งการแจ้งเตือนหาคนเดียว (Push)
 export async function sendLineBotAlert(userId: string, alert: LineBotAlert): Promise<boolean> {
   try {
     const message = formatAlertForLineBot(alert)
 
+    // เรียกใช้ API Route ที่เราสร้างไว้
     const response = await fetch("/api/line/push", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        userId,
-        message,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, message }),
     })
 
     return response.ok
   } catch (error) {
-    console.error("ไม่สามารถส่งการแจ้งเตือนทาง LINE Bot:", error)
+    console.error("Failed to send LINE Push:", error)
     return false
   }
 }
 
-// ส่งการแจ้งเตือนไปยังเพื่อนทั้งหมด
+// 2. ส่งการแจ้งเตือนหาทุกคน (Broadcast)
 export async function broadcastLineBotAlert(alert: LineBotAlert): Promise<boolean> {
   try {
     const message = formatAlertForLineBot(alert)
 
     const response = await fetch("/api/line/broadcast", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
     })
 
     return response.ok
   } catch (error) {
-    console.error("ไม่สามารถส่งการแจ้งเตือนแบบ broadcast:", error)
+    console.error("Failed to broadcast LINE:", error)
     return false
   }
 }
 
+// 3. ฟังก์ชันจัดรูปแบบข้อความ Alert ให้สวยงาม
 export function formatAlertForLineBot(alert: LineBotAlert): string {
-  const severityEmoji =
-    {
-      critical: "🚨",
-      high: "⚠️",
-      medium: "⚡",
-      low: "ℹ️",
-    }[alert.severity] || "📢"
+  const severityEmoji: Record<string, string> = {
+    critical: "🚨",
+    high: "⚠️",
+    medium: "⚡",
+    low: "ℹ️",
+  }
+  
+  const icon = severityEmoji[alert.severity] || "📢"
+  const time = alert.timestamp 
+    ? new Date(alert.timestamp).toLocaleTimeString("th-TH") 
+    : new Date().toLocaleTimeString("th-TH")
 
-  const typeText =
-    {
-      anomaly: "ตรวจพบความผิดปกติ",
-      prediction: "การทำนายจาก AI",
-      optimization: "คำแนะนำการปรับปรุง",
-    }[alert.type] || alert.type
+  // เพิ่มส่วน AI Response ถ้ามี
+  const aiSection = alert.aiResponse 
+    ? `\n🤖 AI Action: ${alert.aiResponse}` 
+    : ""
 
-  return `${severityEmoji} ${typeText}
-
-📌 ${alert.title}
+  return `${icon} แจ้งเตือน: ${alert.title}
 
 ${alert.description}
+${aiSection}
 
-🤖 ความมั่นใจของ AI: ${alert.aiConfidence}%
-⏰ ${alert.timestamp || new Date().toLocaleString("th-TH")}
-
-พิมพ์ "สถานะ" เพื่อดูสถานะระบบ
-พิมพ์ "ช่วยเหลือ" เพื่อดูคำสั่งทั้งหมด`
+⏰ เวลา: ${time}
+(พิมพ์ "สถานะ" เพื่อดูภาพรวม)`
 }
 
-// จัดรูปแบบสถานะระบบสำหรับ LINE
+// 4. ฟังก์ชันดึงสถานะระบบ (แก้ให้ดึงสดจาก Memory ไม่ต้อง fetch)
 export async function formatSystemStatusForLine(): Promise<string> {
   try {
-    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"
+    // ✅ ดึงข้อมูลตรงๆ จาก Simulator (เร็วและชัวร์)
+    const servers = getServerStates()
+    const sensors = getSensorStates()
 
-    const response = await fetch(`${baseUrl}/api/realtime/data`, {
-      cache: "no-store",
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch data")
-    }
-
-    const data = await response.json()
+    const totalServers = servers.length
+    const onlineServers = servers.filter(s => s.status === 'online' || s.status === 'warning').length
+    
+    // ดึงค่า Temp และ Power แบบปลอดภัย
+    const tempSensor = sensors.find(s => s.type === 'temperature')
+    const avgTemp = tempSensor ? tempSensor.value.toFixed(1) : "N/A"
+    
+    const powerSensor = sensors.find(s => s.type === 'power')
+    const powerVal = powerSensor ? powerSensor.value.toFixed(1) : "N/A"
 
     return `📊 รายงานสถานะ Data Center
 
-🖥️ เซิร์ฟเวอร์: ${data.stats.onlineServers}/${data.stats.totalServers} ออนไลน์
-🌡️ อุณหภูมิเฉลี่ย: ${data.stats.avgTemperature.toFixed(1)}°C
-⚡ การใช้พลังงาน: ${data.stats.powerUsage.toFixed(1)}%
-🔄 Uptime: ${data.stats.uptime.toFixed(2)}%
+🖥️ Server: ${onlineServers}/${totalServers} Online
+🌡️ Temp: ${avgTemp}°C
+⚡ Power: ${powerVal} kW
 
-${data.stats.onlineServers === data.stats.totalServers ? "✅ ระบบทั้งหมดทำงานปกติ" : "⚠️ เซิร์ฟเวอร์บางตัวออฟไลน์"}
+${onlineServers === totalServers ? "✅ ระบบทำงานปกติ" : "⚠️ มีเซิร์ฟเวอร์ผิดปกติ"}
 
-พิมพ์ "แจ้งเตือน" เพื่อดู alerts ล่าสุด
-พิมพ์ "ช่วยเหลือ" เพื่อดูคำสั่งทั้งหมด`
+พิมพ์ "ช่วยเหลือ" เพื่อดูเมนู`
   } catch (error) {
-    console.error("Error fetching system status:", error)
-    return "❌ ไม่สามารถดึงข้อมูลได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง"
+    console.error("Error generating status:", error)
+    return "❌ ไม่สามารถดึงข้อมูลได้"
   }
 }
