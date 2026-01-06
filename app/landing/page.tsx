@@ -1,268 +1,531 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Button } from "@/components/ui/button"
-import { ArrowRight, Zap, Shield, TrendingUp, Activity } from "lucide-react"
-import Link from "next/link"
-// 1. เพิ่มการ import Image ของ Next.js
-import Image from "next/image"
+import React, { useEffect, useState } from 'react';
+import { ArrowRight, Zap, Shield, TrendingUp, Activity } from 'lucide-react';
 
 export default function LandingPage() {
-  const [showContent, setShowContent] = useState(false)
-  const [logoPhase, setLogoPhase] = useState<"school" | "competition" | "done">("school")
+  const [showContent, setShowContent] = useState(false);
+  const [logoPhase, setLogoPhase] = useState("school");
 
   useEffect(() => {
     const schoolTimer = setTimeout(() => {
-      setLogoPhase("competition")
-    }, 2000)
+      setLogoPhase("competition");
+    }, 3000);
 
     const competitionTimer = setTimeout(() => {
-      setLogoPhase("done")
-      setShowContent(true)
-    }, 4000)
+      setLogoPhase("done");
+      setShowContent(true);
+    }, 6000);
 
     return () => {
-      clearTimeout(schoolTimer)
-      clearTimeout(competitionTimer)
+      clearTimeout(schoolTimer);
+      clearTimeout(competitionTimer);
+    };
+  }, []);
+
+  // Create floating particles
+  useEffect(() => {
+    if (showContent) {
+      const particles = document.querySelector('.floating-particles');
+      if (particles) {
+        for (let i = 0; i < 15; i++) {
+          const particle = document.createElement('div');
+          particle.className = 'particle';
+          particle.style.left = Math.random() * 100 + '%';
+          particle.style.animationDelay = Math.random() * 12 + 's';
+          particle.style.animationDuration = (Math.random() * 8 + 8) + 's';
+          particles.appendChild(particle);
+        }
+      }
     }
-  }, [])
+  }, [showContent]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-teal-50 to-blue-50 overflow-hidden">
-      <AnimatePresence mode="wait">
-        {logoPhase !== "done" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-white"
-          >
+    <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-white overflow-hidden relative font-sans antialiased">
+      <style>{`
+        @keyframes epicLogoEnter {
+          0% {
+            transform: translate(-50%, -50%) scale(0) rotate(-180deg);
+            opacity: 0;
+          }
+          60% {
+            transform: translate(-50%, -50%) scale(1.1) rotate(10deg);
+          }
+          100% {
+            transform: translate(-50%, -50%) scale(1) rotate(0deg);
+            opacity: 1;
+          }
+        }
+
+        @keyframes scanLine {
+          0% { transform: translate(-50%, -50%) rotate(0deg); }
+          100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        @keyframes logoShine {
+          0% { transform: translateX(-100%) rotate(45deg); }
+          100% { transform: translateX(100%) rotate(45deg); }
+        }
+
+        @keyframes flashEffect {
+          0% { opacity: 0; }
+          50% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+
+        @keyframes floatUp {
+          0% {
+            transform: translateY(100vh) translateX(0);
+            opacity: 0;
+          }
+          10% {
+            opacity: 0.6;
+          }
+          90% {
+            opacity: 0.6;
+          }
+          100% {
+            transform: translateY(-100vh) translateX(50px);
+            opacity: 0;
+          }
+        }
+
+        @keyframes gentleFloat {
+          0%, 100% {
+            transform: translate(0, 0) rotate(0deg);
+          }
+          25% {
+            transform: translate(20px, 20px) rotate(5deg);
+          }
+          50% {
+            transform: translate(0, 40px) rotate(0deg);
+          }
+          75% {
+            transform: translate(-20px, 20px) rotate(-5deg);
+          }
+        }
+
+        @keyframes titleFloat {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+
+        @keyframes contentFadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes ripple {
+          to {
+            transform: scale(4);
+            opacity: 0;
+          }
+        }
+
+        @keyframes screenShake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-2px); }
+          75% { transform: translateX(2px); }
+        }
+
+        .loader-container {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 50%, #ffffff 100%);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1000;
+          animation: ${logoPhase === "done" ? "fadeOut 1.5s ease-in-out forwards" : "none"};
+        }
+
+        @keyframes fadeOut {
+          to {
+            opacity: 0;
+            visibility: hidden;
+          }
+        }
+
+        .logo-animation {
+          position: relative;
+          width: 400px;
+          height: 400px;
+        }
+
+        .logo-animation::before {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 300px;
+          height: 300px;
+          border: 2px solid rgba(168, 218, 220, 0.3);
+          border-radius: 50%;
+          animation: scanLine 3s linear infinite;
+        }
+
+        .school-logo, .competition-logo {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%) scale(0);
+          width: 220px;
+          height: 220px;
+          border-radius: 50%;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          color: white;
+          font-weight: bold;
+          border: 4px solid rgba(255, 255, 255, 0.8);
+          overflow: hidden;
+        }
+
+        .school-logo {
+          background: linear-gradient(135deg, #c77dcd 0%, #9370db 50%, #7b68ee 100%);
+          box-shadow: 
+            0 0 60px rgba(147, 112, 219, 0.9), 
+            0 0 120px rgba(147, 112, 219, 0.6),
+            inset 0 0 60px rgba(255, 255, 255, 0.15);
+          animation: epicLogoEnter 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .school-logo::before {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+          animation: logoShine 2s ease-in-out 1s infinite;
+          transform: rotate(45deg);
+        }
+
+        .competition-logo {
+          background: linear-gradient(135deg, #0d9488 0%, #14b8a6 50%, #06b6d4 100%);
+          box-shadow: 
+            0 0 60px rgba(20, 184, 166, 0.9), 
+            0 0 120px rgba(20, 184, 166, 0.6),
+            inset 0 0 60px rgba(255, 255, 255, 0.15);
+          animation: epicLogoEnter 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+          opacity: 0;
+        }
+
+        .competition-logo::before {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+          animation: logoShine 2s ease-in-out 1s infinite;
+          transform: rotate(45deg);
+        }
+
+        .logo-visible {
+          animation: epicLogoEnter 2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important;
+          opacity: 1 !important;
+        }
+
+        .logo-exit {
+          animation: epicLogoEnter 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) reverse forwards !important;
+        }
+
+        .floating-particles {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          z-index: 1;
+        }
+
+        .particle {
+          position: absolute;
+          width: 8px;
+          height: 8px;
+          background: linear-gradient(45deg, #a8dada, #dda0dd);
+          border-radius: 50%;
+          animation: floatUp 12s infinite linear;
+          opacity: 0.6;
+        }
+
+        .flash-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: radial-gradient(circle, rgba(255,255,255,0.9) 0%, transparent 70%);
+          z-index: 999;
+          animation: flashEffect 0.5s ease-out;
+          pointer-events: none;
+        }
+
+        .content-wrapper {
+          animation: contentFadeIn 2s ease-out both;
+        }
+
+        .hero-title {
+          animation: titleFloat 3s ease-in-out infinite;
+        }
+
+        .cta-button {
+          position: relative;
+          overflow: hidden;
+        }
+
+        .cta-button::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+          transition: left 0.5s ease;
+        }
+
+        .cta-button:hover::before {
+          left: 100%;
+        }
+
+        .feature-card {
+          transition: all 0.4s ease;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .feature-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 4px;
+          background: linear-gradient(90deg, #a8dada, #dda0dd, #ffd1dc);
+        }
+
+        .feature-card:hover {
+          transform: translateY(-10px) scale(1.02);
+        }
+
+        .shape {
+          position: absolute;
+          opacity: 0.1;
+          animation: gentleFloat 20s infinite ease-in-out;
+        }
+
+        .shape-1 {
+          top: 10%;
+          left: 10%;
+          width: 120px;
+          height: 120px;
+          background: linear-gradient(45deg, #a8dada, #b0e0e6);
+          border-radius: 50%;
+        }
+
+        .shape-2 {
+          top: 60%;
+          right: 15%;
+          width: 100px;
+          height: 100px;
+          background: linear-gradient(45deg, #dda0dd, #e6e6fa);
+          border-radius: 20px;
+          animation-delay: -7s;
+        }
+
+        .shape-3 {
+          bottom: 20%;
+          left: 20%;
+          width: 80px;
+          height: 80px;
+          background: linear-gradient(45deg, #ffd1dc, #ffe4e1);
+          transform: rotate(45deg);
+          animation-delay: -14s;
+        }
+      `}</style>
+
+      {/* Loading Animation */}
+      {logoPhase !== "done" && (
+        <div className="loader-container">
+          <div className="logo-animation">
             {logoPhase === "school" && (
-              <motion.div
-                initial={{ scale: 0.5, rotate: -180, opacity: 0 }}
-                animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                exit={{ scale: 1.5, opacity: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="text-center"
-              >
-                {/* 2. แก้ไขส่วนแสดงโลโก้โรงเรียน */}
-                {/* เพิ่ม p-4 เพื่อให้มีระยะห่างจากขอบ และ overflow-hidden */}
-                <div className="w-48 h-48 mx-auto mb-6 bg-gradient-to-br from-blue-600 to-teal-600 rounded-3xl flex items-center justify-center shadow-2xl p-4 overflow-hidden relative">
-                  {/* แทนที่ span ด้วย Image */}
-                  {/* หมายเหตุ: อย่าลืมเอารูป school-logo.png ไปใส่ในโฟลเดอร์ public */}
-                  <Image
-                    src="/school-logo.png" // เปลี่ยน path ตามชื่อไฟล์จริงของคุณในโฟลเดอร์ public
-                    alt="ตราโรงเรียน"
-                    width={160}
-                    height={160}
-                    className="object-contain w-full h-full"
-                  />
-                </div>
-                <h1 className="text-4xl font-bold text-gray-900">โรงเรียนวิทยาศาสตร์จุฬาภรณราชวิทยาลัย ลพบุรี</h1>
-              </motion.div>
+              <div className="school-logo">
+                <img
+                  src="/school-logo.png"
+                  alt="School Logo"
+                  className="w-full h-full object-contain p-4"
+                  style={{ opacity: 1 }}
+                />
+              </div>
             )}
-
+            
             {logoPhase === "competition" && (
-              <motion.div
-                initial={{ scale: 0.5, rotate: 180, opacity: 0 }}
-                animate={{ scale: 1, rotate: 360, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="text-center"
-              >
-                {/* 3. แก้ไขส่วนแสดงโลโก้การแข่งขัน */}
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 2, ease: "linear", repeat: Number.POSITIVE_INFINITY }}
-                  // เพิ่ม p-4 และ overflow-hidden เช่นกัน
-                  className="w-48 h-48 mx-auto mb-6 bg-gradient-to-br from-teal-600 to-blue-600 rounded-full flex items-center justify-center shadow-2xl p-4 overflow-hidden relative"
-                >
-                  {/* แทนที่ span ด้วย Image และมันจะหมุนตาม container */}
-                  {/* หมายเหตุ: อย่าลืมเอารูป competition-logo.png ไปใส่ในโฟลเดอร์ public */}
-                  <Image
-                    src="/competition-logo.png" // เปลี่ยน path ตามชื่อไฟล์จริงของคุณในโฟลเดอร์ public
-                    alt="โลโก้การแข่งขัน"
-                    width={160}
-                    height={160}
-                    className="object-contain w-full h-full"
-                  />
-                </motion.div>
-                <h1 className="text-4xl font-bold text-gray-900">Young Business IT</h1>
-              </motion.div>
+              <div className="competition-logo logo-visible">
+                <img
+                  src="/competition-logo.png"
+                  alt="Competition Logo"
+                  className="w-full h-full object-contain p-4"
+                  style={{ opacity: 1 }}
+                />
+              </div>
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
 
-      <AnimatePresence>
-        {showContent && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-            {/* Hero Section */}
-            <section className="relative min-h-screen flex items-center justify-center px-6">
-              {/* Animated Background Elements */}
-              <div className="absolute inset-0 overflow-hidden">
-                <motion.div
-                  animate={{
-                    scale: [1, 1.2, 1],
-                    rotate: [0, 90, 0],
-                  }}
-                  transition={{
-                    duration: 20,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "linear",
-                  }}
-                  className="absolute -top-32 -left-32 w-96 h-96 bg-teal-200 rounded-full opacity-20 blur-3xl"
-                />
-                <motion.div
-                  animate={{
-                    scale: [1, 1.3, 1],
-                    rotate: [0, -90, 0],
-                  }}
-                  transition={{
-                    duration: 25,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "linear",
-                  }}
-                  className="absolute -bottom-32 -right-32 w-96 h-96 bg-blue-200 rounded-full opacity-20 blur-3xl"
-                />
+      {/* Floating Particles & Shapes */}
+      {showContent && (
+        <>
+          <div className="floating-particles"></div>
+          <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+            <div className="shape shape-1"></div>
+            <div className="shape shape-2"></div>
+            <div className="shape shape-3"></div>
+          </div>
+        </>
+      )}
+
+      {/* Main Content */}
+      {showContent && (
+        <div className="content-wrapper relative z-10">
+          {/* Hero Section */}
+          <section className="relative min-h-screen flex items-center justify-center px-6 pt-20 pb-32">
+            <div className="max-w-6xl mx-auto text-center">
+              <div className="inline-block mb-4 px-4 py-1.5 rounded-full bg-gradient-to-r from-teal-100 to-blue-100 text-teal-700 font-semibold text-sm border border-teal-200">
+                ⚡ Next Gen Infrastructure
+              </div>
+              
+              <h1 className="hero-title text-5xl md:text-8xl font-extrabold mb-6 tracking-tight leading-tight bg-gradient-to-r from-teal-600 via-purple-500 to-pink-400 bg-clip-text text-transparent">
+                Autonomous Data Center
+              </h1>
+              
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-600 mb-6">
+                Optimization AI Platform
+              </h2>
+              
+              <p className="text-lg md:text-xl text-gray-500 mb-10 max-w-3xl mx-auto leading-relaxed">
+                ระบบ AI อัจฉริยะสำหรับบริหารจัดการ Data Center แบบอัตโนมัติ<br/>
+                ด้วยเทคโนโลยี Machine Learning และ Unity 3D Simulation
+              </p>
+
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-20">
+                <a 
+                  href="/dashboard"
+                  className="cta-button px-8 py-4 text-lg font-semibold rounded-full bg-gradient-to-r from-teal-500 to-blue-500 text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 inline-flex items-center justify-center"
+                >
+                  เข้าสู่ Dashboard
+                  <ArrowRight className="inline-block ml-2 w-5 h-5" />
+                </a>
+                <a 
+                  href="/unity"
+                  className="cta-button px-8 py-4 text-lg font-semibold rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 inline-flex items-center justify-center"
+                >
+                  <Zap className="inline-block mr-2 w-5 h-5" />
+                  ดู 3D Simulation
+                </a>
               </div>
 
-              <div className="relative z-10 max-w-6xl mx-auto text-center">
-                <motion.div
-                  initial={{ y: 30, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.2, duration: 0.8 }}
-                >
-                  <h1 className="text-6xl md:text-8xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-teal-600 to-blue-600">
-                    Autonomous Data Center
-                  </h1>
-                  <p className="text-2xl md:text-3xl text-gray-700 mb-4">Optimization AI Platform</p>
-                  <p className="text-lg md:text-xl text-gray-600 mb-12 max-w-3xl mx-auto">
-                    ระบบ AI อัจฉริยะสำหรับบริหารจัดการ Data Center แบบอัตโนมัติ ด้วยเทคโนโลยี Machine Learning และ Unity
-                    3D Simulation
-                  </p>
-                </motion.div>
-
-                <motion.div
-                  initial={{ y: 30, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.4, duration: 0.8 }}
-                  className="flex flex-wrap gap-4 justify-center"
-                >
-                  <Link href="/dashboard">
-                    <Button size="lg" className="text-lg px-8 py-6 bg-teal-600 hover:bg-teal-700">
-                      เข้าสู่ Dashboard
-                      <ArrowRight className="ml-2 w-5 h-5" />
-                    </Button>
-                  </Link>
-                  <Link href="/unity">
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      className="text-lg px-8 py-6 border-teal-600 text-teal-600 hover:bg-teal-50 bg-transparent"
-                    >
-                      ดู 3D Simulation
-                    </Button>
-                  </Link>
-                </motion.div>
-
-                {/* Features Grid */}
-                <motion.div
-                  initial={{ y: 50, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.6, duration: 0.8 }}
-                  className="mt-24 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-                >
-                  {[
-                    {
-                      icon: Activity,
-                      title: "Real-time Monitoring",
-                      description: "ตรวจสอบสถานะเซิร์ฟเวอร์แบบเรียลไทม์",
-                      color: "from-blue-500 to-blue-600",
-                    },
-                    {
-                      icon: Shield,
-                      title: "Anomaly Detection",
-                      description: "ตรวจจับความผิดปกติด้วย AI",
-                      color: "from-teal-500 to-teal-600",
-                    },
-                    {
-                      icon: TrendingUp,
-                      title: "Predictive Maintenance",
-                      description: "ทำนายปัญหาก่อนเกิดขึ้น",
-                      color: "from-green-500 to-green-600",
-                    },
-                    {
-                      icon: Zap,
-                      title: "Auto Optimization",
-                      description: "ปรับแต่งระบบอัตโนมัติ",
-                      color: "from-orange-500 to-orange-600",
-                    },
-                  ].map((feature, index) => (
-                    <motion.div
+              {/* Features Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                  {
+                    icon: Activity,
+                    title: "Real-time Monitoring",
+                    description: "ตรวจสอบสถานะเซิร์ฟเวอร์แบบเรียลไทม์",
+                    gradient: "from-blue-500 to-blue-600",
+                  },
+                  {
+                    icon: Shield,
+                    title: "Anomaly Detection",
+                    description: "ตรวจจับความผิดปกติด้วย AI",
+                    gradient: "from-teal-500 to-teal-600",
+                  },
+                  {
+                    icon: TrendingUp,
+                    title: "Predictive Maintenance",
+                    description: "ทำนายปัญหาก่อนเกิดขึ้นจริง",
+                    gradient: "from-green-500 to-green-600",
+                  },
+                  {
+                    icon: Zap,
+                    title: "Auto Optimization",
+                    description: "ปรับแต่งการใช้พลังงานอัตโนมัติ",
+                    gradient: "from-orange-500 to-orange-600",
+                  },
+                ].map((feature, index) => {
+                  const Icon = feature.icon;
+                  return (
+                    <div
                       key={index}
-                      initial={{ y: 30, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: 0.8 + index * 0.1, duration: 0.6 }}
-                      whileHover={{ y: -10, transition: { duration: 0.2 } }}
-                      className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-shadow"
+                      className="feature-card bg-white/80 backdrop-blur-xl rounded-3xl p-8 border border-white/50 shadow-xl"
                     >
-                      <div
-                        className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4`}
-                      >
-                        <feature.icon className="w-6 h-6 text-white" />
+                      <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-6 shadow-md`}>
+                        <Icon className="w-7 h-7 text-white" />
                       </div>
-                      <h3 className="text-xl font-bold text-gray-900 mb-2">{feature.title}</h3>
-                      <p className="text-gray-600">{feature.description}</p>
-                    </motion.div>
-                  ))}
-                </motion.div>
+                      <h3 className="text-xl font-bold text-gray-800 mb-2">{feature.title}</h3>
+                      <p className="text-gray-600 leading-relaxed">{feature.description}</p>
+                    </div>
+                  );
+                })}
               </div>
-            </section>
+            </div>
+          </section>
 
-            {/* Stats Section */}
-            <section className="py-20 bg-white/50 backdrop-blur">
-              <div className="max-w-6xl mx-auto px-6">
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center"
-                >
-                  {[
-                    { value: "99.9%", label: "Uptime" },
-                    { value: "40%", label: "Energy Saved" },
-                    { value: "85%", label: "Accuracy" },
-                    { value: "24/7", label: "Monitoring" },
-                  ].map((stat, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      whileInView={{ scale: 1, opacity: 1 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: index * 0.1, duration: 0.5 }}
-                    >
-                      <div className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-600 to-blue-600">
-                        {stat.value}
-                      </div>
-                      <div className="text-gray-600 mt-2">{stat.label}</div>
-                    </motion.div>
-                  ))}
-                </motion.div>
+          {/* Stats Section */}
+          <section className="py-20 bg-white/60 backdrop-blur-md border-t border-gray-100">
+            <div className="max-w-6xl mx-auto px-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+                {[
+                  { value: "99.9%", label: "Uptime" },
+                  { value: "40%", label: "Energy Saved" },
+                  { value: "85%", label: "AI Accuracy" },
+                  { value: "24/7", label: "Monitoring" },
+                ].map((stat, index) => (
+                  <div key={index} className="p-4">
+                    <div className="text-5xl font-bold bg-gradient-to-r from-teal-600 to-blue-600 bg-clip-text text-transparent font-mono">
+                      {stat.value}
+                    </div>
+                    <div className="text-gray-500 mt-2 font-medium uppercase tracking-wider text-sm">
+                      {stat.label}
+                    </div>
+                  </div>
+                ))}
               </div>
-            </section>
+            </div>
+          </section>
 
-            {/* Footer */}
-            <footer className="py-12 bg-gray-900 text-white">
-              <div className="max-w-6xl mx-auto px-6 text-center">
-                <p className="text-lg mb-2">Young Business IT Competition 2025</p>
-                <p className="text-gray-400">Autonomous Data Center Optimization AI Platform</p>
-              </div>
-            </footer>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          {/* Footer */}
+          <footer className="py-12 bg-gray-900 text-white relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-400 via-purple-500 to-pink-400"></div>
+            <div className="max-w-6xl mx-auto px-6 text-center relative z-10">
+              <p className="text-xl font-bold mb-2">Young Business IT Competition 2025</p>
+              <p className="text-gray-400">Autonomous Data Center Optimization AI Platform</p>
+              <p className="text-gray-600 text-sm mt-4">© 2025 PCSHS Lopburi. All rights reserved.</p>
+            </div>
+          </footer>
+        </div>
+      )}
     </div>
-  )
+  );
 }
