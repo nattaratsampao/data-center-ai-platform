@@ -4,8 +4,14 @@ import {
   updateSimulation, 
   getServerStates, 
   getActiveEvents,
-  getSensorStates // ✅ อย่าลืม import อันใหม่เข้ามา
+  getSensorStates // ✅ เราจะใช้ตัวนี้ดึงค่า Sensor รวม
 } from "@/lib/event-simulator"
+
+// --------------------------------------------------------
+// 1️⃣ CONFIG: ใส่ URL ของ Python Server (Render)
+// --------------------------------------------------------
+const PYTHON_API_URL = "https://datacenter-api-4o3g.onrender.com"; 
+// อย่าลืมแก้ URL ให้ตรงกับของจริงนะครับ!
 
 // Initialize on first load
 let initialized = false
@@ -14,90 +20,175 @@ if (!initialized) {
   initialized = true
 }
 
-export async function GET() {
-  updateSimulation() // อัปเดต state กลาง
+// Helper Function: ยิงไปถาม AI
+async function getPredictionFromPython(features: number[], endpoint: string) {
+    try {
+        const res = await fetch(`${PYTHON_API_URL}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ features: features }),
+            cache: 'no-store'
+        });
 
-  const data = generateRealtimeData()
-  return NextResponse.json(data)
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (error) {
+        console.error(`AI Error (${endpoint}):`, error);
+        return null; // ถ้า AI ล่ม ให้ return null (เว็บจะได้ไม่พัง)
+    }
 }
 
-// app/api/realtime/data/route.ts
+export async function GET() {
+  updateSimulation() // ขยับค่าตัวเลขต่างๆ (Simulation Step)
 
-// ... (ส่วน import และอื่นๆ เหมือนเดิม)
-
-function generateRealtimeData() {
-  const now = new Date()
-  const timestamp = now.toISOString()
-  
   const serverStates = getServerStates()
   const activeEvents = getActiveEvents()
   const sensorStates = getSensorStates() 
 
-  // ✅ แก้ไขการ Map Server Data ตรงนี้ครับ
-  const servers = serverStates.map((server) => {
-    // Logic การแบ่ง Rack ให้ตรงกับที่ Heatmap ต้องการ
+  // เตรียมตัวแปรสำหรับสรุปภาพรวม
+  let totalMaintenanceNeeded = 0;
+  let criticalEvents = 0;
+
+  // --------------------------------------------------------
+  // 2️⃣ SERVER LOOP: วนลูปทุก Server เพื่อถาม AI (Model 2 & 3)
+  // --------------------------------------------------------
+  const serversWithAI = await Promise.all(serverStates.map(async (server) => {
+    
+    // จัดการเรื่อง Rack Name (ตาม Logic เดิม)
     let rackName = "Rack C";
-    const idNum = parseInt(server.id.replace("srv", ""));
+    const idNum = parseInt(server.id.replace("srv", "")); // ตัด srv ออกเหลือแค่เลข
+    if (!isNaN(idNum)) {
+        if (idNum <= 3) rackName = "Rack A";
+        else if (idNum <= 6) rackName = "Rack B";
+    }
+
+    // --- เตรียม Features ให้ตรงกับ Python Model (Maintenance) ---
+    // Model ต้องการ: [cpu, mem, temp, vibration, power, error_rate, uptime]
+    // แต่ ServerState เรามีไม่ครบ เราต้อง "Estimate" บางค่าจากข้อมูลที่มี
     
-    if (idNum <= 3) rackName = "Rack A";      // Server 1-3 อยู่ Rack A
-    else if (idNum <= 6) rackName = "Rack B"; // Server 4-6 อยู่ Rack B
-    
+    // 1. Vibration: ถ้ามี Event สั่นสะเทือน ให้ค่าสูง, ถ้าไม่มีให้ค่าต่ำ
+    const vibrationEvent = server.activeEvents.find(e => e.type === 'vibration_alert');
+    const estVibration = vibrationEvent ? 0.8 : 0.02 + (Math.random() * 0.05);
+
+    // 2. Power (Individual): ประมาณการจาก CPU (สมมติ Max 500W)
+    const estPower = 100 + (server.cpu / 100) * 400; 
+
+    // 3. Error Rate: คำนวณกลับจาก HealthScore
+    const estErrorRate = (100 - server.healthScore) / 100;
+
+    // 4. Uptime: สมมติค่าไปก่อน (หรือจะเก็บใน state ก็ได้)
+    const estUptime = 120; // days
+
+    const maintenanceFeatures = [
+        server.cpu,
+        server.memory,
+        server.temperature,
+        estVibration,
+        estPower,
+        estErrorRate,
+        estUptime
+    ];
+
+    // --- ยิงถาม AI ---
+    const maintResult = await getPredictionFromPython(maintenanceFeatures, "/predict/maintenance");
+
+    // รับผลจาก AI
+    let needsMaintenance = false;
+    let breakdownProb = 0;
+
+    if (maintResult) {
+        needsMaintenance = maintResult.needs_maintenance;
+        breakdownProb = maintResult.breakdown_probability; // ค่า 0.0 - 1.0
+        if (needsMaintenance) totalMaintenanceNeeded++;
+    }
+
+    // ตรวจสอบ Event critical
+    if (server.status === 'critical') criticalEvents++;
+
     return {
       ...server,
+      // ปัดเศษทศนิยมให้สวยงามก่อนส่งกลับ
       cpu: Math.round(server.cpu),
       memory: Math.round(server.memory),
       temperature: Math.round(server.temperature * 10) / 10,
       network: Math.round(server.network),
       healthScore: Math.round(server.healthScore),
-      
-      // ⚠️ เปลี่ยนจาก location เป็น rack และใช้ค่า "Rack X"
-      rack: rackName, 
-      
+      rack: rackName,
       activeEvents: server.activeEvents.length,
+      
+      // ✅ ข้อมูลชุดใหม่จาก AI
+      aiAnalysis: {
+          needsMaintenance: needsMaintenance,
+          breakdownProbability: Math.round(breakdownProb * 100) // แปลงเป็น %
+      }
     };
-  })
+  }));
 
-  // ... (ส่วน sensors และ stats เหมือนเดิม ไม่ต้องแก้)
+  // --------------------------------------------------------
+  // 3️⃣ SYSTEM ANOMALY: ถาม AI ภาพรวม (Model 1)
+  // --------------------------------------------------------
+  // Model ต้องการ: [avg_temp, humidity, total_power, avg_vibration]
   
-  // (Copy ส่วนที่เหลือมาแปะ เพื่อความชัวร์)
-  const sensors = sensorStates.map(s => ({
+  // ดึงค่าจาก Sensors จริงๆ ใน Simulator
+  const avgTemp = Math.round((serversWithAI.reduce((sum, s) => sum + s.temperature, 0) / serversWithAI.length) * 10) / 10;
+  const humiditySensor = sensorStates.find(s => s.type === 'humidity');
+  const powerSensor = sensorStates.find(s => s.type === 'power');
+  const vibSensor = sensorStates.find(s => s.type === 'vibration');
+
+  const anomalyFeatures = [
+      avgTemp, 
+      humiditySensor ? humiditySensor.value : 50,  // ถ้าหาไม่เจอใช้ค่ากลาง 50
+      powerSensor ? powerSensor.value : 25000,     // ถ้าหาไม่เจอใช้ค่าสมมติ
+      vibSensor ? vibSensor.value : 0.5
+  ];
+
+  const anomalyResult = await getPredictionFromPython(anomalyFeatures, "/predict/anomaly");
+  const isSystemAnomaly = anomalyResult ? anomalyResult.is_anomaly : false;
+
+
+  // --------------------------------------------------------
+  // 4️⃣ FINAL RESPONSE: ประกอบร่างส่งกลับหน้าเว็บ
+  // --------------------------------------------------------
+  const timestamp = new Date().toISOString();
+  
+  // Format Sensors ให้สวยงาม
+  const formattedSensors = sensorStates.map(s => ({
     ...s,
-    value: Math.round(s.value * 10) / 10,
+    value: Math.round(s.value * 100) / 100, // ทศนิยม 2 ตำแหน่ง
     lastUpdated: timestamp
-  }))
+  }));
 
-  const onlineServers = servers.filter((s) => s.status === "online" || s.status === "warning").length
-  const avgTemp = Math.round((servers.reduce((sum, s) => sum + s.temperature, 0) / servers.length) * 10) / 10
-  const totalPower = sensors.find(s => s.type === "power")?.value || 0;
+  const onlineServers = serversWithAI.filter((s) => s.status === "online" || s.status === "warning").length;
+  const totalPowerValue = powerSensor ? powerSensor.value : 0;
 
-  return {
+  return NextResponse.json({
     timestamp: timestamp,
-    servers, // ส่ง servers ที่มี field 'rack' แล้ว
-    sensors: sensors, 
+    servers: serversWithAI,
+    sensors: formattedSensors,
     activeEvents: activeEvents.map((event) => ({
       ...event,
       timestamp: event.timestamp || timestamp,
     })),
     stats: {
-      totalServers: servers.length,
+      totalServers: serversWithAI.length,
       onlineServers,
       avgTemperature: avgTemp,
-      avgCPU: Math.round(servers.reduce((sum, s) => sum + s.cpu, 0) / servers.length),
-      powerUsage: Math.round(totalPower * 1.5),
-      pue: 1.45,
+      avgCPU: Math.round(serversWithAI.reduce((sum, s) => sum + s.cpu, 0) / serversWithAI.length),
+      powerUsage: Math.round(totalPowerValue * 10) / 10,
+      pue: 1.45, // ค่า PUE คงที่ (หรือจะคำนวณจริงก็ได้)
     },
-
+    
+    // ส่วนสรุป AI Insight
     aiInsights: {
-          anomalyDetected: activeEvents.some((e: any) => e.severity === "critical"),
-          predictiveAlerts: activeEvents.filter((e: any) => e.type?.includes("prediction")).length,
+          anomalyDetected: isSystemAnomaly, // ✅ มาจาก Model 1 (Isolation Forest)
+          predictiveAlerts: totalMaintenanceNeeded, // ✅ มาจาก Model 2 (XGBoost)
           
-          // ✅ แก้ตรงนี้: ให้สุ่มค่าทีละนิด เพื่อให้กราฟขยับ (Simulation)
-          optimizationsSuggested: Math.floor(Math.random() * 5) + 1, 
-          confidenceScore: Math.round((85 + Math.random() * 14) * 10) / 10, // สุ่มระหว่าง 85% - 99%
+          optimizationsSuggested: Math.floor(Math.random() * 3) + 1, 
+          confidenceScore: 94.5, // % ความมั่นใจ
           
-          // ✅ เพิ่มค่าใหม่สำหรับกราฟอีก 2 แท่ง
-          maintenanceScore: Math.round((75 + Math.random() * 20) * 10) / 10,
-          loadBalancingScore: Math.round((80 + Math.random() * 15) * 10) / 10,
+          // คำนวณคะแนนสุขภาพระบบ (Maintenance Score)
+          maintenanceScore: Math.max(0, 100 - (totalMaintenanceNeeded * 15) - (criticalEvents * 10)),
+          loadBalancingScore: 88.5,
         },
-  }
+  })
 }
